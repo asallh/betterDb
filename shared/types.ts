@@ -1,0 +1,64 @@
+export interface ConnectionConfig {
+  id: string;
+  name: string;
+  engine: 'postgres';
+  host: string;
+  port: number;
+  database: string;
+  user: string;
+  password: string;
+  ssl?: boolean;
+  color?: string;
+}
+
+export interface TableInfo {
+  schema: string;
+  name: string;
+  type: 'table' | 'view';
+  rowCountEstimate?: number;
+}
+
+export interface ColumnInfo {
+  name: string;
+  dataType: string;
+  nullable: boolean;
+  defaultValue: string | null;
+  isPrimaryKey: boolean;
+  isForeignKey: boolean;
+  references?: { table: string; column: string };
+}
+
+export interface QueryResult {
+  columns: string[];
+  rows: Record<string, unknown>[];
+  rowCount: number;
+  durationMs: number;
+  error?: string;
+}
+
+export interface PaginationParams {
+  offset: number;
+  limit: number;
+  orderBy?: string;
+  orderDir?: 'ASC' | 'DESC';
+}
+
+export interface CellUpdate {
+  schema: string;
+  table: string;
+  column: string;
+  value: unknown;
+  primaryKeys: Record<string, unknown>; // PK column -> value to identify the row
+}
+
+export interface RowDelete {
+  schema: string;
+  table: string;
+  primaryKeys: Record<string, unknown>;
+}
+
+export interface RowInsert {
+  schema: string;
+  table: string;
+  values: Record<string, unknown>;
+}
