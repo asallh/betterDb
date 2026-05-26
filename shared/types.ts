@@ -28,8 +28,14 @@ export interface ColumnInfo {
   references?: { table: string; column: string };
 }
 
+export interface ColumnType {
+  name: string;
+  dataType: string;
+}
+
 export interface QueryResult {
   columns: string[];
+  columnTypes?: ColumnType[];
   rows: Record<string, unknown>[];
   rowCount: number;
   durationMs: number;

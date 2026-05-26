@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { db } from "@/lib/ipc";
-import type { QueryResult } from "../../../shared/types";
+import type { QueryResult, ColumnInfo } from "../../../shared/types";
 import {
   Loader2,
   ChevronLeft,
@@ -26,6 +26,39 @@ interface EditingCell {
   value: string;
 }
 
+const TYPE_COLORS: Record<string, string> = {
+  int2: "text-blue-500",
+  int4: "text-blue-500",
+  int8: "text-blue-500",
+  float4: "text-blue-500",
+  float8: "text-blue-500",
+  numeric: "text-blue-500",
+  money: "text-blue-500",
+  bool: "text-amber-500",
+  text: "text-green-600 dark:text-green-400",
+  varchar: "text-green-600 dark:text-green-400",
+  bpchar: "text-green-600 dark:text-green-400",
+  char: "text-green-600 dark:text-green-400",
+  name: "text-green-600 dark:text-green-400",
+  date: "text-purple-500",
+  time: "text-purple-500",
+  timetz: "text-purple-500",
+  timestamp: "text-purple-500",
+  timestamptz: "text-purple-500",
+  interval: "text-purple-500",
+  uuid: "text-orange-500",
+  json: "text-pink-500",
+  jsonb: "text-pink-500",
+  bytea: "text-red-500",
+  inet: "text-cyan-500",
+  cidr: "text-cyan-500",
+  macaddr: "text-cyan-500",
+};
+
+function getTypeColor(dataType: string): string {
+  return TYPE_COLORS[dataType] ?? "text-muted-foreground";
+}
+
 export function TableViewer({ schema, table }: Props) {
   const [result, setResult] = useState<QueryResult | null>(null);
   const [totalRows, setTotalRows] = useState(0);
@@ -35,19 +68,21 @@ export function TableViewer({ schema, table }: Props) {
   const [orderBy, setOrderBy] = useState<string | undefined>();
   const [orderDir, setOrderDir] = useState<"ASC" | "DESC">("ASC");
   const [primaryKeys, setPrimaryKeys] = useState<string[]>([]);
+  const [columnInfo, setColumnInfo] = useState<ColumnInfo[]>([]);
   const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
   const [savingCell, setSavingCell] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [insertingRow, setInsertingRow] = useState(false);
   const [newRowValues, setNewRowValues] = useState<Record<string, string>>({});
   const [savingRow, setSavingRow] = useState(false);
+  const [hoveredCol, setHoveredCol] = useState<string | null>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
   const parentRef = useRef<HTMLDivElement>(null);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [data, count, pks] = await Promise.all([
+      const [data, count, pks, cols] = await Promise.all([
         db.getTableData(schema, table, {
           offset: page * pageSize,
           limit: pageSize,
@@ -56,10 +91,12 @@ export function TableViewer({ schema, table }: Props) {
         }),
         db.getTableRowCount(schema, table),
         db.getPrimaryKeys(schema, table),
+        db.getColumns(schema, table),
       ]);
       setResult(data);
       setTotalRows(count);
       setPrimaryKeys(pks);
+      setColumnInfo(cols);
     } finally {
       setIsLoading(false);
     }
@@ -91,6 +128,13 @@ export function TableViewer({ schema, table }: Props) {
     estimateSize: () => 28,
     overscan: 20,
   });
+
+  // Build a lookup for column metadata
+  const colInfoMap = new Map(columnInfo.map((c) => [c.name, c]));
+
+  function getColType(colName: string): string {
+    return colInfoMap.get(colName)?.dataType ?? "";
+  }
 
   function handleSort(column: string) {
     if (orderBy === column) {
@@ -128,7 +172,6 @@ export function TableViewer({ schema, table }: Props) {
       pkValues[pk] = row[pk];
     }
 
-    // Check if value actually changed
     const oldValue = row[editingCell.column];
     const oldStr = oldValue === null || oldValue === undefined ? "" : String(oldValue);
     if (editingCell.value === oldStr) {
@@ -151,7 +194,6 @@ export function TableViewer({ schema, table }: Props) {
       return;
     }
 
-    // Update local data immediately
     setResult((prev) => {
       if (!prev) return prev;
       const newRows = [...prev.rows];
@@ -213,7 +255,6 @@ export function TableViewer({ schema, table }: Props) {
       cancelEdit();
     } else if (e.key === "Tab" && editingCell && result) {
       e.preventDefault();
-      // Save current then move to next column
       commitEdit().then(() => {
         const cols = result.columns;
         const currentIdx = cols.indexOf(editingCell.column);
@@ -321,32 +362,71 @@ export function TableViewer({ schema, table }: Props) {
             <thead className="sticky top-0 z-10 bg-muted">
               <tr>
                 {canEdit && (
-                  <th className="border-b border-r border-border px-1 py-1.5 text-center font-medium text-muted-foreground w-8" />
+                  <th className="border-b border-r border-border px-1 py-1 text-center font-medium text-muted-foreground w-8" />
                 )}
-                <th className="border-b border-r border-border px-2 py-1.5 text-left font-medium text-muted-foreground w-10">
+                <th className="border-b border-r border-border px-2 py-1 text-left font-medium text-muted-foreground w-10">
                   #
                 </th>
-                {result?.columns.map((col) => (
-                  <th
-                    key={col}
-                    onClick={() => handleSort(col)}
-                    className={`cursor-pointer select-none border-b border-r border-border px-2 py-1.5 text-left font-medium whitespace-nowrap hover:bg-accent ${
-                      primaryKeys.includes(col)
-                        ? "text-yellow-600 dark:text-yellow-400"
-                        : "text-muted-foreground"
-                    }`}
-                  >
-                    <span className="flex items-center gap-1">
-                      {col}
-                      {orderBy === col &&
-                        (orderDir === "ASC" ? (
-                          <ArrowUp className="h-3 w-3" />
-                        ) : (
-                          <ArrowDown className="h-3 w-3" />
-                        ))}
-                    </span>
-                  </th>
-                ))}
+                {result?.columns.map((col) => {
+                  const colType = getColType(col);
+                  const isPK = primaryKeys.includes(col);
+                  const info = colInfoMap.get(col);
+                  const isHovered = hoveredCol === col;
+
+                  return (
+                    <th
+                      key={col}
+                      onClick={() => handleSort(col)}
+                      onMouseEnter={() => setHoveredCol(col)}
+                      onMouseLeave={() => setHoveredCol(null)}
+                      className={`cursor-pointer select-none border-b border-r border-border px-2 py-1 text-left font-medium whitespace-nowrap transition-colors ${
+                        isHovered
+                          ? "bg-accent"
+                          : ""
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className={
+                            isPK
+                              ? "text-yellow-600 dark:text-yellow-400"
+                              : "text-foreground"
+                          }
+                        >
+                          {col}
+                        </span>
+                        <span
+                          className={`text-[10px] font-normal ${getTypeColor(
+                            colType
+                          )}`}
+                        >
+                          {colType}
+                        </span>
+                        {isPK && (
+                          <span className="text-[9px] font-normal rounded bg-yellow-500/15 text-yellow-600 dark:text-yellow-400 px-1">
+                            PK
+                          </span>
+                        )}
+                        {info?.isForeignKey && (
+                          <span className="text-[9px] font-normal rounded bg-blue-500/15 text-blue-500 px-1">
+                            FK
+                          </span>
+                        )}
+                        {info?.nullable === false && !isPK && (
+                          <span className="text-[9px] font-normal rounded bg-red-500/10 text-red-400 px-1">
+                            NN
+                          </span>
+                        )}
+                        {orderBy === col &&
+                          (orderDir === "ASC" ? (
+                            <ArrowUp className="h-3 w-3 text-foreground" />
+                          ) : (
+                            <ArrowDown className="h-3 w-3 text-foreground" />
+                          ))}
+                      </div>
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody>
@@ -379,22 +459,25 @@ export function TableViewer({ schema, table }: Props) {
                   <td className="border-b border-r border-border px-2 py-1 text-muted-foreground italic">
                     new
                   </td>
-                  {result.columns.map((col) => (
-                    <td key={col} className="border-b border-r border-border p-0">
-                      <input
-                        className="w-full bg-transparent px-2 py-1 text-xs outline-none focus:bg-primary/5"
-                        placeholder={primaryKeys.includes(col) ? `${col} (PK)` : col}
-                        value={newRowValues[col] ?? ""}
-                        onChange={(e) =>
-                          setNewRowValues((v) => ({ ...v, [col]: e.target.value }))
-                        }
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") handleInsertRow();
-                          if (e.key === "Escape") { setInsertingRow(false); setNewRowValues({}); }
-                        }}
-                      />
-                    </td>
-                  ))}
+                  {result.columns.map((col) => {
+                    const colType = getColType(col);
+                    return (
+                      <td key={col} className="border-b border-r border-border p-0">
+                        <input
+                          className="w-full bg-transparent px-2 py-1 text-xs outline-none focus:bg-primary/5"
+                          placeholder={`${col} (${colType})`}
+                          value={newRowValues[col] ?? ""}
+                          onChange={(e) =>
+                            setNewRowValues((v) => ({ ...v, [col]: e.target.value }))
+                          }
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleInsertRow();
+                            if (e.key === "Escape") { setInsertingRow(false); setNewRowValues({}); }
+                          }}
+                        />
+                      </td>
+                    );
+                  })}
                 </tr>
               )}
 
@@ -438,6 +521,7 @@ export function TableViewer({ schema, table }: Props) {
                           const isEditing =
                             editingCell?.rowIndex === virtualRow.index &&
                             editingCell?.column === col;
+                          const isColHovered = hoveredCol === col;
 
                           if (isEditing) {
                             return (
@@ -469,8 +553,12 @@ export function TableViewer({ schema, table }: Props) {
                               onDoubleClick={() =>
                                 canEdit && startEditing(virtualRow.index, col)
                               }
-                              className={`border-b border-r border-border px-2 py-1 whitespace-nowrap ${
+                              onMouseEnter={() => setHoveredCol(col)}
+                              onMouseLeave={() => setHoveredCol(null)}
+                              className={`border-b border-r border-border px-2 py-1 whitespace-nowrap transition-colors ${
                                 canEdit ? "cursor-text" : ""
+                              } ${
+                                isColHovered ? "bg-primary/[0.03]" : ""
                               } ${
                                 isNull
                                   ? "italic text-muted-foreground/50"

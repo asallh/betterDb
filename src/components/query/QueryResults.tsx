@@ -1,7 +1,28 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { QueryTab } from "@/stores/queryStore";
 import { Loader2, AlertCircle } from "lucide-react";
+
+const TYPE_COLORS: Record<string, string> = {
+  int2: "text-blue-500", int4: "text-blue-500", int8: "text-blue-500",
+  float4: "text-blue-500", float8: "text-blue-500", numeric: "text-blue-500",
+  money: "text-blue-500", bool: "text-amber-500",
+  text: "text-green-600 dark:text-green-400",
+  varchar: "text-green-600 dark:text-green-400",
+  bpchar: "text-green-600 dark:text-green-400",
+  char: "text-green-600 dark:text-green-400",
+  name: "text-green-600 dark:text-green-400",
+  date: "text-purple-500", time: "text-purple-500", timetz: "text-purple-500",
+  timestamp: "text-purple-500", timestamptz: "text-purple-500",
+  interval: "text-purple-500", uuid: "text-orange-500",
+  json: "text-pink-500", jsonb: "text-pink-500",
+  bytea: "text-red-500", inet: "text-cyan-500", cidr: "text-cyan-500",
+  macaddr: "text-cyan-500",
+};
+
+function getTypeColor(dataType: string): string {
+  return TYPE_COLORS[dataType] ?? "text-muted-foreground";
+}
 
 interface Props {
   tab: QueryTab;
@@ -10,6 +31,12 @@ interface Props {
 export function QueryResults({ tab }: Props) {
   const parentRef = useRef<HTMLDivElement>(null);
   const { result, isExecuting } = tab;
+  const [hoveredCol, setHoveredCol] = useState<string | null>(null);
+
+  // Build a map of column name -> data type from columnTypes
+  const typeMap = new Map(
+    result?.columnTypes?.map((ct) => [ct.name, ct.dataType]) ?? []
+  );
 
   const rowVirtualizer = useVirtualizer({
     count: result?.rows.length ?? 0,
@@ -69,14 +96,30 @@ export function QueryResults({ tab }: Props) {
             <th className="border-b border-r border-border px-2 py-1.5 text-left font-medium text-muted-foreground w-10">
               #
             </th>
-            {result.columns.map((col) => (
-              <th
-                key={col}
-                className="border-b border-r border-border px-2 py-1.5 text-left font-medium text-muted-foreground whitespace-nowrap"
-              >
-                {col}
-              </th>
-            ))}
+            {result.columns.map((col) => {
+              const dataType = typeMap.get(col);
+              return (
+                <th
+                  key={col}
+                  className={`border-b border-r border-border px-2 py-1.5 text-left font-medium text-muted-foreground whitespace-nowrap cursor-default select-none ${
+                    hoveredCol === col ? "bg-accent" : ""
+                  }`}
+                  onMouseEnter={() => setHoveredCol(col)}
+                  onMouseLeave={() => setHoveredCol(null)}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span>{col}</span>
+                    {dataType && (
+                      <span
+                        className={`text-[10px] font-normal opacity-75 ${getTypeColor(dataType)}`}
+                      >
+                        {dataType}
+                      </span>
+                    )}
+                  </div>
+                </th>
+              );
+            })}
           </tr>
         </thead>
         <tbody>
@@ -113,7 +156,9 @@ export function QueryResults({ tab }: Props) {
                               : typeof value === "number"
                               ? "text-right font-mono"
                               : ""
-                          }`}
+                          } ${hoveredCol === col ? "bg-primary/[0.03]" : ""}`}
+                          onMouseEnter={() => setHoveredCol(col)}
+                          onMouseLeave={() => setHoveredCol(null)}
                         >
                           {isNull ? "NULL" : String(value)}
                         </td>

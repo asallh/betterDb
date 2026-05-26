@@ -13,6 +13,27 @@ import type {
 
 const { Pool } = pg;
 
+// Map of PostgreSQL OID -> type name for common types
+const PG_TYPE_MAP: Record<number, string> = {
+  16: "bool", 17: "bytea", 18: "char", 19: "name", 20: "int8",
+  21: "int2", 23: "int4", 24: "regproc", 25: "text", 26: "oid",
+  114: "json", 142: "xml", 600: "point", 700: "float4", 701: "float8",
+  790: "money", 829: "macaddr", 869: "inet", 650: "cidr",
+  1042: "bpchar", 1043: "varchar", 1082: "date", 1083: "time",
+  1114: "timestamp", 1184: "timestamptz", 1186: "interval",
+  1266: "timetz", 1560: "bit", 1562: "varbit", 1700: "numeric",
+  2950: "uuid", 3802: "jsonb", 3904: "int4range", 3906: "numrange",
+  3908: "tsrange", 3910: "tstzrange", 3912: "daterange", 3926: "int8range",
+  1000: "bool[]", 1005: "int2[]", 1007: "int4[]", 1009: "text[]",
+  1016: "int8[]", 1021: "float4[]", 1022: "float8[]", 1015: "varchar[]",
+  1014: "bpchar[]", 1115: "timestamp[]", 1185: "timestamptz[]",
+  2951: "uuid[]", 3807: "jsonb[]", 1231: "numeric[]",
+};
+
+function resolveTypeName(oid: number): string {
+  return PG_TYPE_MAP[oid] ?? `oid:${oid}`;
+}
+
 export class PostgresAdapter extends DatabaseAdapter {
   private pool: pg.Pool | null = null;
 
@@ -64,6 +85,10 @@ export class PostgresAdapter extends DatabaseAdapter {
       }
       return {
         columns: res.fields.map((f) => f.name),
+        columnTypes: res.fields.map((f) => ({
+          name: f.name,
+          dataType: resolveTypeName(f.dataTypeID),
+        })),
         rows: res.rows,
         rowCount: res.rows.length,
         durationMs,
