@@ -1,7 +1,7 @@
 export interface ConnectionConfig {
   id: string;
   name: string;
-  engine: 'postgres';
+  engine: 'postgres' | 'supabase' | 'aws';
   host: string;
   port: number;
   database: string;

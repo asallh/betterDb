@@ -7,12 +7,9 @@ export class ConnectionManager {
   private activeConnectionId: string | null = null;
 
   createAdapter(config: ConnectionConfig): DatabaseAdapter {
-    switch (config.engine) {
-      case "postgres":
-        return new PostgresAdapter(config);
-      default:
-        throw new Error(`Unsupported engine: ${config.engine}`);
-    }
+    // All engines are PostgreSQL-compatible (Supabase, AWS RDS, etc.)
+    // The engine field only determines the UI icon
+    return new PostgresAdapter(config);
   }
 
   async connect(config: ConnectionConfig): Promise<void> {

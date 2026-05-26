@@ -20,7 +20,8 @@ export function StatusBar() {
             <span className="flex items-center gap-1.5">
               <DatabaseEngineIcon
                 engine={active.engine}
-                className="h-3.5 w-3.5 text-blue-500"
+                colored
+                className="h-3.5 w-3.5"
               />
               <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
               {active.name}

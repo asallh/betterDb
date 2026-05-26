@@ -3,7 +3,7 @@ import { useConnectionStore } from "@/stores/connectionStore";
 import { useSchemaStore } from "@/stores/schemaStore";
 import { SchemaTree } from "@/components/schema/SchemaTree";
 import { ConnectionPanel } from "@/components/connections/ConnectionPanel";
-import { DatabaseEngineIcon } from "@/components/icons/DatabaseIcons";
+import { DatabaseEngineIcon, DatabaseCylinderIcon } from "@/components/icons/DatabaseIcons";
 import {
   RefreshCw,
   LogOut,
@@ -176,7 +176,8 @@ export function Sidebar() {
         >
           <DatabaseEngineIcon
             engine={active.engine}
-            className="h-4 w-4 text-blue-500 shrink-0"
+            colored
+            className="h-4 w-4 shrink-0"
           />
           {showContent && (
             <div
@@ -232,7 +233,7 @@ export function Sidebar() {
               className="flex w-full items-center justify-between px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
             >
               <div className="flex items-center gap-2">
-                <DatabaseEngineIcon engine="postgres" className="h-3.5 w-3.5" />
+                <DatabaseCylinderIcon className="h-3.5 w-3.5" />
                 <span>Connections</span>
                 {connections.length > 0 && (
                   <span className="rounded-full bg-muted px-1.5 text-[10px] tabular-nums">
@@ -258,7 +259,7 @@ export function Sidebar() {
               className="rounded p-1.5 hover:bg-accent text-muted-foreground"
               title="Connections"
             >
-              <DatabaseEngineIcon engine="postgres" className="h-4 w-4" />
+              <DatabaseCylinderIcon className="h-4 w-4" />
             </button>
           </div>
         )}

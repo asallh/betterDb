@@ -118,6 +118,41 @@ function ConfirmDeleteDialog({
   );
 }
 
+function ConnectionFormModal({
+  connection,
+  onClose,
+}: {
+  connection: ConnectionConfig | null;
+  onClose: () => void;
+}) {
+  const backdropRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  return (
+    <div
+      ref={backdropRef}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      onMouseDown={(e) => {
+        if (e.target === backdropRef.current) onClose();
+      }}
+    >
+      <div className="mx-4 w-full max-w-md rounded-lg border border-border bg-popover p-5 shadow-lg">
+        <h2 className="mb-4 text-sm font-semibold">
+          {connection ? "Edit Connection" : "New Connection"}
+        </h2>
+        <ConnectionForm connection={connection} onClose={onClose} />
+      </div>
+    </div>
+  );
+}
+
 export function ConnectionPanel() {
   const connections = useConnectionStore((s) => s.connections);
   const connect = useConnectionStore((s) => s.connect);
@@ -160,8 +195,9 @@ export function ConnectionPanel() {
             >
               <DatabaseEngineIcon
                 engine={conn.engine}
+                colored={isActive}
                 className={`h-4 w-4 shrink-0 ${
-                  isActive ? "text-blue-500" : "text-muted-foreground/60"
+                  isActive ? "" : "text-muted-foreground/60"
                 }`}
               />
               <div className="flex flex-1 flex-col min-w-0">
@@ -221,34 +257,33 @@ export function ConnectionPanel() {
           );
         })}
 
-        {connections.length === 0 && !showForm && (
+        {connections.length === 0 && (
           <div className="py-3 text-center text-[11px] text-muted-foreground/60">
             No saved connections
           </div>
         )}
       </div>
 
-      {/* Add/Edit form */}
-      {showForm || editingConnection ? (
-        <div className="border-t border-border p-2">
-          <ConnectionForm
-            connection={editingConnection}
-            onClose={() => {
-              setShowForm(false);
-              setEditingConnection(null);
-            }}
-          />
-        </div>
-      ) : (
-        <div className="p-1.5 pt-0">
-          <button
-            onClick={() => setShowForm(true)}
-            className="flex w-full items-center justify-center gap-1.5 rounded border border-dashed border-border px-2 py-1.5 text-[11px] text-muted-foreground hover:border-primary hover:text-primary transition-colors"
-          >
-            <Plus className="h-3 w-3" />
-            New Connection
-          </button>
-        </div>
+      {/* New Connection button */}
+      <div className="p-1.5 pt-0">
+        <button
+          onClick={() => setShowForm(true)}
+          className="flex w-full items-center justify-center gap-1.5 rounded border border-dashed border-border px-2 py-1.5 text-[11px] text-muted-foreground hover:border-primary hover:text-primary transition-colors"
+        >
+          <Plus className="h-3 w-3" />
+          New Connection
+        </button>
+      </div>
+
+      {/* Connection form modal */}
+      {(showForm || editingConnection) && (
+        <ConnectionFormModal
+          connection={editingConnection}
+          onClose={() => {
+            setShowForm(false);
+            setEditingConnection(null);
+          }}
+        />
       )}
 
       {/* Confirm delete dialog */}
