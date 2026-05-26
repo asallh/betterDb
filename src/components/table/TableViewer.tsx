@@ -115,11 +115,22 @@ export function TableViewer({ schema, table }: Props) {
     loadData();
   }, [loadData]);
 
+  const prevEditCellRef = useRef<{ rowIndex: number; column: string } | null>(null);
   useEffect(() => {
     if (editingCell && editInputRef.current) {
-      editInputRef.current.focus();
-      editInputRef.current.select();
+      const prev = prevEditCellRef.current;
+      const isNewCell =
+        !prev ||
+        prev.rowIndex !== editingCell.rowIndex ||
+        prev.column !== editingCell.column;
+      if (isNewCell) {
+        editInputRef.current.focus();
+        editInputRef.current.select();
+      }
     }
+    prevEditCellRef.current = editingCell
+      ? { rowIndex: editingCell.rowIndex, column: editingCell.column }
+      : null;
   }, [editingCell]);
 
   const rowVirtualizer = useVirtualizer({
