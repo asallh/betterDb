@@ -11,8 +11,6 @@ import {
   Loader2,
   MoreVertical,
 } from "lucide-react";
-import type { ConnectionConfig } from "../../../shared/types";
-
 function ConnectionMenu({
   onEdit,
   onDelete,
@@ -127,11 +125,11 @@ export function ConnectionPanel() {
   const isConnecting = useConnectionStore((s) => s.isConnecting);
   const error = useConnectionStore((s) => s.error);
   const [showForm, setShowForm] = useState(false);
-  const [editingConnection, setEditingConnection] =
-    useState<ConnectionConfig | null>(null);
+  const [editingConnectionId, setEditingConnectionId] =
+    useState<string | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [confirmDeleteConn, setConfirmDeleteConn] =
-    useState<ConnectionConfig | null>(null);
+    useState<{ id: string; name: string } | null>(null);
 
   return (
     <div className="max-h-80 overflow-auto border-t border-border">
@@ -210,10 +208,10 @@ export function ConnectionPanel() {
               {menuOpenId === conn.id && (
                 <ConnectionMenu
                   onEdit={() => {
-                    setEditingConnection(conn);
+                    setEditingConnectionId(conn.id);
                     setShowForm(true);
                   }}
-                  onDelete={() => setConfirmDeleteConn(conn)}
+                  onDelete={() => setConfirmDeleteConn({ id: conn.id, name: conn.name })}
                   onClose={() => setMenuOpenId(null)}
                 />
               )}
@@ -229,13 +227,13 @@ export function ConnectionPanel() {
       </div>
 
       {/* Add/Edit form */}
-      {showForm || editingConnection ? (
+      {showForm || editingConnectionId ? (
         <div className="border-t border-border p-2">
           <ConnectionForm
-            connection={editingConnection}
+            connectionId={editingConnectionId}
             onClose={() => {
               setShowForm(false);
-              setEditingConnection(null);
+              setEditingConnectionId(null);
             }}
           />
         </div>

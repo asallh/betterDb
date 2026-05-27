@@ -34,6 +34,11 @@ function resolveTypeName(oid: number): string {
   return PG_TYPE_MAP[oid] ?? `oid:${oid}`;
 }
 
+/** Safely quote a SQL identifier (schema, table, column name) to prevent injection. */
+function quoteIdent(name: string): string {
+  return '"' + name.replace(/"/g, '""') + '"';
+}
+
 export class PostgresAdapter extends DatabaseAdapter {
   private pool: pg.Pool | null = null;
 
@@ -48,7 +53,7 @@ export class PostgresAdapter extends DatabaseAdapter {
       database: this.config.database,
       user: this.config.user,
       password: this.config.password,
-      ssl: this.config.ssl ? { rejectUnauthorized: false } : false,
+      ssl: this.config.ssl ? { rejectUnauthorized: this.config.sslRejectUnauthorized !== false } : false,
       max: 3,
       idleTimeoutMillis: 30000,
     });
@@ -203,11 +208,11 @@ export class PostgresAdapter extends DatabaseAdapter {
     table: string,
     pagination: PaginationParams
   ): Promise<QueryResult> {
-    const quotedTable = `"${schema}"."${table}"`;
+    const quotedTable = `${quoteIdent(schema)}.${quoteIdent(table)}`;
     let sql = `SELECT * FROM ${quotedTable}`;
     if (pagination.orderBy) {
       const dir = pagination.orderDir === "DESC" ? "DESC" : "ASC";
-      sql += ` ORDER BY "${pagination.orderBy}" ${dir}`;
+      sql += ` ORDER BY ${quoteIdent(pagination.orderBy)} ${dir}`;
     }
     sql += ` LIMIT ${Number(pagination.limit)} OFFSET ${Number(pagination.offset)}`;
     return this.executeQuery(sql);
@@ -215,7 +220,7 @@ export class PostgresAdapter extends DatabaseAdapter {
 
   async getTableRowCount(schema: string, table: string): Promise<number> {
     if (!this.pool) throw new Error("Not connected");
-    const quotedTable = `"${schema}"."${table}"`;
+    const quotedTable = `${quoteIdent(schema)}.${quoteIdent(table)}`;
     const res = await this.pool.query(
       `SELECT count(*)::int AS count FROM ${quotedTable}`
     );
@@ -245,13 +250,13 @@ export class PostgresAdapter extends DatabaseAdapter {
       return { columns: [], rows: [], rowCount: 0, durationMs: 0, error: "No primary key — cannot identify row to update" };
     }
 
-    const setCols = [`"${update.column}" = $1`];
+    const setCols = [`${quoteIdent(update.column)} = $1`];
     const params: unknown[] = [update.value === "" ? null : update.value];
 
-    const whereParts = pkEntries.map(([ col ], i) => `"${col}" = $${i + 2}`);
+    const whereParts = pkEntries.map(([ col ], i) => `${quoteIdent(col)} = $${i + 2}`);
     pkEntries.forEach(([, val]) => params.push(val));
 
-    const sql = `UPDATE "${update.schema}"."${update.table}" SET ${setCols.join(", ")} WHERE ${whereParts.join(" AND ")}`;
+    const sql = `UPDATE ${quoteIdent(update.schema)}.${quoteIdent(update.table)} SET ${setCols.join(", ")} WHERE ${whereParts.join(" AND ")}`;
     const start = performance.now();
     try {
       const res = await this.pool.query(sql, params);
@@ -268,10 +273,10 @@ export class PostgresAdapter extends DatabaseAdapter {
       return { columns: [], rows: [], rowCount: 0, durationMs: 0, error: "No primary key — cannot identify row to delete" };
     }
 
-    const whereParts = pkEntries.map(([col], i) => `"${col}" = $${i + 1}`);
+    const whereParts = pkEntries.map(([col], i) => `${quoteIdent(col)} = $${i + 1}`);
     const values = pkEntries.map(([, val]) => val);
 
-    const sql = `DELETE FROM "${params.schema}"."${params.table}" WHERE ${whereParts.join(" AND ")}`;
+    const sql = `DELETE FROM ${quoteIdent(params.schema)}.${quoteIdent(params.table)} WHERE ${whereParts.join(" AND ")}`;
     const start = performance.now();
     try {
       const res = await this.pool.query(sql, values);
@@ -288,11 +293,11 @@ export class PostgresAdapter extends DatabaseAdapter {
       return { columns: [], rows: [], rowCount: 0, durationMs: 0, error: "No values provided" };
     }
 
-    const cols = entries.map(([col]) => `"${col}"`).join(", ");
+    const cols = entries.map(([col]) => quoteIdent(col)).join(", ");
     const placeholders = entries.map((_, i) => `$${i + 1}`).join(", ");
     const values = entries.map(([, val]) => val === "" ? null : val);
 
-    const sql = `INSERT INTO "${params.schema}"."${params.table}" (${cols}) VALUES (${placeholders}) RETURNING *`;
+    const sql = `INSERT INTO ${quoteIdent(params.schema)}.${quoteIdent(params.table)} (${cols}) VALUES (${placeholders}) RETURNING *`;
     const start = performance.now();
     try {
       const res = await this.pool.query(sql, values);
@@ -315,7 +320,7 @@ export class PostgresAdapter extends DatabaseAdapter {
       database: this.config.database,
       user: this.config.user,
       password: this.config.password,
-      ssl: this.config.ssl ? { rejectUnauthorized: false } : false,
+      ssl: this.config.ssl ? { rejectUnauthorized: this.config.sslRejectUnauthorized !== false } : false,
       max: 1,
       connectionTimeoutMillis: 5000,
     });

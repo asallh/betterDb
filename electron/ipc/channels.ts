@@ -3,6 +3,7 @@ export const IPC = {
   CONNECTIONS_SAVE: "db:connections:save",
   CONNECTIONS_DELETE: "db:connections:delete",
   CONNECTIONS_TEST: "db:connections:test",
+  CONNECTIONS_GET: "db:connections:get",
 
   CONNECT: "db:connect",
   DISCONNECT: "db:disconnect",

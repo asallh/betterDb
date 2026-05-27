@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useConnectionStore } from "@/stores/connectionStore";
+import { db } from "@/lib/ipc";
 import type { ConnectionConfig } from "../../../shared/types";
 import { CheckCircle, XCircle, Loader2, Link } from "lucide-react";
 
 interface Props {
-  connection: ConnectionConfig | null;
+  connectionId: string | null;
   onClose: () => void;
 }
 
@@ -44,34 +45,56 @@ function buildConnectionString(form: {
   return `postgresql://${form.user}${pass}@${form.host}:${form.port}/${form.database}${ssl}`;
 }
 
-export function ConnectionForm({ connection, onClose }: Props) {
+export function ConnectionForm({ connectionId, onClose }: Props) {
   const saveConnection = useConnectionStore((s) => s.saveConnection);
   const testConnection = useConnectionStore((s) => s.testConnection);
   const connect = useConnectionStore((s) => s.connect);
 
   const [mode, setMode] = useState<FormMode>("fields");
-  const [connectionString, setConnectionString] = useState(
-    connection
-      ? buildConnectionString({
-          host: connection.host,
-          port: String(connection.port),
-          database: connection.database,
-          user: connection.user,
-          password: connection.password,
-          ssl: connection.ssl ?? false,
-        })
-      : ""
-  );
+  const [connectionString, setConnectionString] = useState("");
+  const [isLoading, setIsLoading] = useState(!!connectionId);
 
   const [form, setForm] = useState({
-    name: connection?.name ?? "",
-    host: connection?.host ?? "localhost",
-    port: String(connection?.port ?? 5432),
-    database: connection?.database ?? "",
-    user: connection?.user ?? "postgres",
-    password: connection?.password ?? "",
-    ssl: connection?.ssl ?? false,
+    name: "",
+    host: "localhost",
+    port: "5432",
+    database: "",
+    user: "postgres",
+    password: "",
+    ssl: false,
+    sslRejectUnauthorized: true,
   });
+
+  // Fetch full connection config (with password) from main process when editing
+  useEffect(() => {
+    if (!connectionId) return;
+    let cancelled = false;
+    db.getConnection(connectionId).then((conn) => {
+      if (cancelled) return;
+      setForm({
+        name: conn.name,
+        host: conn.host,
+        port: String(conn.port),
+        database: conn.database,
+        user: conn.user,
+        password: conn.password,
+        ssl: conn.ssl ?? false,
+        sslRejectUnauthorized: conn.sslRejectUnauthorized !== false,
+      });
+      setConnectionString(
+        buildConnectionString({
+          host: conn.host,
+          port: String(conn.port),
+          database: conn.database,
+          user: conn.user,
+          password: conn.password,
+          ssl: conn.ssl ?? false,
+        })
+      );
+      setIsLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [connectionId]);
 
   const [testResult, setTestResult] = useState<{
     success: boolean;
@@ -96,9 +119,17 @@ export function ConnectionForm({ connection, onClose }: Props) {
     }
   }
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-4">
+        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
   function buildConfig(): ConnectionConfig {
     return {
-      id: connection?.id ?? crypto.randomUUID(),
+      id: connectionId ?? crypto.randomUUID(),
       engine: "postgres",
       name: form.name || `${form.host}/${form.database}`,
       host: form.host,
@@ -107,6 +138,7 @@ export function ConnectionForm({ connection, onClose }: Props) {
       user: form.user,
       password: form.password,
       ssl: form.ssl,
+      sslRejectUnauthorized: form.sslRejectUnauthorized,
     };
   }
 
@@ -281,6 +313,22 @@ export function ConnectionForm({ connection, onClose }: Props) {
               Use SSL
             </label>
           </div>
+          {form.ssl && (
+            <div className="col-span-2 flex items-center gap-1.5 ml-4">
+              <input
+                type="checkbox"
+                id="ssl-reject-unauth"
+                checked={!form.sslRejectUnauthorized}
+                onChange={(e) =>
+                  setForm({ ...form, sslRejectUnauthorized: !e.target.checked })
+                }
+                className="rounded border-input"
+              />
+              <label htmlFor="ssl-reject-unauth" className="text-[11px] text-muted-foreground">
+                Allow self-signed certificates (insecure)
+              </label>
+            </div>
+          )}
         </div>
       )}
 

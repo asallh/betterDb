@@ -11,7 +11,19 @@ import type { ConnectionConfig, PaginationParams, CellUpdate, RowDelete, RowInse
 export function registerIpcHandlers(manager: ConnectionManager): void {
   // -- Connection management --
   ipcMain.handle(IPC.CONNECTIONS_LIST, async () => {
-    return loadConnections();
+    const connections = await loadConnections();
+    // Strip passwords from listing — renderer doesn't need them for display
+    return connections.map(({ password: _, ...rest }) => ({
+      ...rest,
+      password: "",
+    }));
+  });
+
+  ipcMain.handle(IPC.CONNECTIONS_GET, async (_event, id: string) => {
+    const connections = await loadConnections();
+    const config = connections.find((c) => c.id === id);
+    if (!config) throw new Error(`Connection not found: ${id}`);
+    return config;
   });
 
   ipcMain.handle(

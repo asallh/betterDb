@@ -1,24 +1,18 @@
 import { ipcRenderer, contextBridge } from 'electron'
+import { IPC } from './ipc/channels'
 
-// --------- Expose some API to the Renderer process ---------
+// Only allow IPC calls to known channels
+const ALLOWED_CHANNELS: Set<string> = new Set(Object.values(IPC))
+
+function validateChannel(channel: string): void {
+  if (!ALLOWED_CHANNELS.has(channel)) {
+    throw new Error(`IPC channel not allowed: ${channel}`)
+  }
+}
+
 contextBridge.exposeInMainWorld('ipcRenderer', {
-  on(...args: Parameters<typeof ipcRenderer.on>) {
-    const [channel, listener] = args
-    return ipcRenderer.on(channel, (event, ...args) => listener(event, ...args))
+  invoke(channel: string, ...args: unknown[]) {
+    validateChannel(channel)
+    return ipcRenderer.invoke(channel, ...args)
   },
-  off(...args: Parameters<typeof ipcRenderer.off>) {
-    const [channel, ...omit] = args
-    return ipcRenderer.off(channel, ...omit)
-  },
-  send(...args: Parameters<typeof ipcRenderer.send>) {
-    const [channel, ...omit] = args
-    return ipcRenderer.send(channel, ...omit)
-  },
-  invoke(...args: Parameters<typeof ipcRenderer.invoke>) {
-    const [channel, ...omit] = args
-    return ipcRenderer.invoke(channel, ...omit)
-  },
-
-  // You can expose other APTs you need here.
-  // ...
 })

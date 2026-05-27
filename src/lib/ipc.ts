@@ -17,6 +17,8 @@ export const db = {
     window.ipcRenderer.invoke("db:connections:save", config),
   deleteConnection: (id: string): Promise<void> =>
     window.ipcRenderer.invoke("db:connections:delete", id),
+  getConnection: (id: string): Promise<ConnectionConfig> =>
+    window.ipcRenderer.invoke("db:connections:get", id) as Promise<ConnectionConfig>,
   testConnection: (
     config: ConnectionConfig
   ): Promise<{ success: boolean; error?: string }> =>

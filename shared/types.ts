@@ -8,6 +8,7 @@ export interface ConnectionConfig {
   user: string;
   password: string;
   ssl?: boolean;
+  sslRejectUnauthorized?: boolean;
   color?: string;
 }
 

@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useConnectionStore } from "@/stores/connectionStore";
 import { ConnectionForm } from "./ConnectionForm";
 import { Database, Plus, Trash2, Plug } from "lucide-react";
-import type { ConnectionConfig } from "../../../shared/types";
 
 export function ConnectionList() {
   const connections = useConnectionStore((s) => s.connections);
@@ -12,8 +11,8 @@ export function ConnectionList() {
   const isConnecting = useConnectionStore((s) => s.isConnecting);
   const error = useConnectionStore((s) => s.error);
   const [showForm, setShowForm] = useState(false);
-  const [editingConnection, setEditingConnection] =
-    useState<ConnectionConfig | null>(null);
+  const [editingConnectionId, setEditingConnectionId] =
+    useState<string | null>(null);
 
   useEffect(() => {
     loadConnections();
@@ -68,7 +67,7 @@ export function ConnectionList() {
                 </button>
                 <button
                   onClick={() => {
-                    setEditingConnection(conn);
+                    setEditingConnectionId(conn.id);
                     setShowForm(true);
                   }}
                   className="rounded p-1.5 hover:bg-muted text-muted-foreground"
@@ -89,12 +88,12 @@ export function ConnectionList() {
         </div>
       )}
 
-      {showForm || editingConnection ? (
+      {showForm || editingConnectionId ? (
         <ConnectionForm
-          connection={editingConnection}
+          connectionId={editingConnectionId}
           onClose={() => {
             setShowForm(false);
-            setEditingConnection(null);
+            setEditingConnectionId(null);
           }}
         />
       ) : (
