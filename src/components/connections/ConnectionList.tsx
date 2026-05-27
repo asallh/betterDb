@@ -1,8 +1,44 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useConnectionStore } from "@/stores/connectionStore";
 import { ConnectionForm } from "./ConnectionForm";
-import { Database, Plus, Trash2, Plug } from "lucide-react";
+import { DatabaseEngineIcon } from "@/components/icons/DatabaseIcons";
+import { Plus, Trash2, Plug } from "lucide-react";
 import type { ConnectionConfig } from "../../../shared/types";
+
+function ConnectionFormModal({
+  connection,
+  onClose,
+}: {
+  connection: ConnectionConfig | null;
+  onClose: () => void;
+}) {
+  const backdropRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  return (
+    <div
+      ref={backdropRef}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      onMouseDown={(e) => {
+        if (e.target === backdropRef.current) onClose();
+      }}
+    >
+      <div className="mx-4 w-full max-w-md rounded-lg border border-border bg-popover p-5 shadow-lg">
+        <h2 className="mb-4 text-sm font-semibold">
+          {connection ? "Edit Connection" : "New Connection"}
+        </h2>
+        <ConnectionForm connection={connection} onClose={onClose} />
+      </div>
+    </div>
+  );
+}
 
 export function ConnectionList() {
   const connections = useConnectionStore((s) => s.connections);
@@ -22,7 +58,7 @@ export function ConnectionList() {
   return (
     <div className="w-full max-w-md space-y-6 p-8">
       <div className="text-center">
-        <Database className="mx-auto h-12 w-12 text-primary" />
+        <DatabaseEngineIcon engine="postgres" className="mx-auto h-12 w-12 text-primary" />
         <h1 className="mt-4 text-2xl font-bold">BetterDB</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Connect to a PostgreSQL database
@@ -47,7 +83,7 @@ export function ConnectionList() {
                 onClick={() => connect(conn.id)}
                 disabled={isConnecting}
               >
-                <Database className="h-4 w-4 text-muted-foreground shrink-0" />
+                <DatabaseEngineIcon engine={conn.engine} className="h-4 w-4 text-muted-foreground shrink-0" />
                 <div className="min-w-0">
                   <div className="text-sm font-medium truncate">
                     {conn.name}
@@ -74,7 +110,7 @@ export function ConnectionList() {
                   className="rounded p-1.5 hover:bg-muted text-muted-foreground"
                   title="Edit"
                 >
-                  <Database className="h-3.5 w-3.5" />
+                  <DatabaseEngineIcon engine={conn.engine} className="h-3.5 w-3.5" />
                 </button>
                 <button
                   onClick={() => deleteConnection(conn.id)}
@@ -89,22 +125,22 @@ export function ConnectionList() {
         </div>
       )}
 
-      {showForm || editingConnection ? (
-        <ConnectionForm
+      <button
+        onClick={() => setShowForm(true)}
+        className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-border p-3 text-sm text-muted-foreground hover:border-primary hover:text-primary transition-colors"
+      >
+        <Plus className="h-4 w-4" />
+        New Connection
+      </button>
+
+      {(showForm || editingConnection) && (
+        <ConnectionFormModal
           connection={editingConnection}
           onClose={() => {
             setShowForm(false);
             setEditingConnection(null);
           }}
         />
-      ) : (
-        <button
-          onClick={() => setShowForm(true)}
-          className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-border p-3 text-sm text-muted-foreground hover:border-primary hover:text-primary transition-colors"
-        >
-          <Plus className="h-4 w-4" />
-          New Connection
-        </button>
       )}
 
       {isConnecting && (
