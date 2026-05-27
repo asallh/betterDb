@@ -158,8 +158,9 @@ export function ConnectionPanel() {
             >
               <DatabaseEngineIcon
                 engine={conn.engine}
+                colored={isActive}
                 className={`h-4 w-4 shrink-0 ${
-                  isActive ? "text-blue-500" : "text-muted-foreground/60"
+                  isActive ? "" : "text-muted-foreground/60"
                 }`}
               />
               <div className="flex flex-1 flex-col min-w-0">
@@ -219,7 +220,7 @@ export function ConnectionPanel() {
           );
         })}
 
-        {connections.length === 0 && !showForm && (
+        {connections.length === 0 && (
           <div className="py-3 text-center text-[11px] text-muted-foreground/60">
             No saved connections
           </div>

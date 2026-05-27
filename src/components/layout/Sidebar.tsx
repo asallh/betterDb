@@ -3,7 +3,7 @@ import { useConnectionStore } from "@/stores/connectionStore";
 import { useSchemaStore } from "@/stores/schemaStore";
 import { SchemaTree } from "@/components/schema/SchemaTree";
 import { ConnectionPanel } from "@/components/connections/ConnectionPanel";
-import { DatabaseEngineIcon } from "@/components/icons/DatabaseIcons";
+import { DatabaseEngineIcon, DatabaseCylinderIcon } from "@/components/icons/DatabaseIcons";
 import {
   RefreshCw,
   LogOut,
@@ -60,7 +60,7 @@ export function Sidebar() {
       function onMouseMove(e: MouseEvent) {
         const newWidth = Math.min(
           MAX_WIDTH,
-          Math.max(MIN_WIDTH, startWidth + (e.clientX - startX))
+          Math.max(MIN_WIDTH, startWidth + (e.clientX - startX)),
         );
         setWidth(newWidth);
       }
@@ -74,7 +74,7 @@ export function Sidebar() {
       document.addEventListener("mousemove", onMouseMove);
       document.addEventListener("mouseup", onMouseUp);
     },
-    [width, collapsed]
+    [width, collapsed],
   );
 
   // Disable text selection while resizing
@@ -101,9 +101,10 @@ export function Sidebar() {
       className="relative flex h-full flex-col border-r border-border bg-card shrink-0 overflow-hidden"
       style={{
         width: currentWidth,
-        transition: isAnimating && !isResizing
-          ? `width ${TRANSITION_MS}ms cubic-bezier(0.4, 0, 0.2, 1)`
-          : undefined,
+        transition:
+          isAnimating && !isResizing
+            ? `width ${TRANSITION_MS}ms cubic-bezier(0.4, 0, 0.2, 1)`
+            : undefined,
       }}
     >
       {/* Header */}
@@ -114,10 +115,17 @@ export function Sidebar() {
               className="flex items-center gap-2 text-sm font-semibold tracking-tight truncate pl-1"
               style={{
                 opacity: isAnimating && collapsed ? 0 : 1,
-                transition: isAnimating ? `opacity ${TRANSITION_MS * 0.6}ms ease` : undefined,
+                transition: isAnimating
+                  ? `opacity ${TRANSITION_MS * 0.6}ms ease`
+                  : undefined,
               }}
             >
-              <span className="text-primary">BetterDB</span>
+              <div className="flex min-w-0 items-center gap-1 pl-1 text-sm font-semibold tracking-tight">
+                <span className="min-2-0 truncate text-primary">BetterDB</span>
+                <span className="text-secondary text-[10px] mx-3 shrink-0 inline-flex items-center bg-[#93D5FB]/70 border border-[#3AA3E8] py-px px-1.5 rounded-full leading-none">
+                  Beta
+                </span>
+              </div>
             </div>
             <div className="flex gap-0.5 shrink-0">
               {active && (
@@ -168,14 +176,17 @@ export function Sidebar() {
         >
           <DatabaseEngineIcon
             engine={active.engine}
-            className="h-4 w-4 text-blue-500 shrink-0"
+            colored
+            className="h-4 w-4 shrink-0"
           />
           {showContent && (
             <div
               className="min-w-0 flex-1"
               style={{
                 opacity: isAnimating && collapsed ? 0 : 1,
-                transition: isAnimating ? `opacity ${TRANSITION_MS * 0.6}ms ease` : undefined,
+                transition: isAnimating
+                  ? `opacity ${TRANSITION_MS * 0.6}ms ease`
+                  : undefined,
               }}
             >
               <div className="text-xs font-medium truncate">{active.name}</div>
@@ -194,7 +205,9 @@ export function Sidebar() {
           <div
             style={{
               opacity: isAnimating && collapsed ? 0 : 1,
-              transition: isAnimating ? `opacity ${TRANSITION_MS * 0.6}ms ease` : undefined,
+              transition: isAnimating
+                ? `opacity ${TRANSITION_MS * 0.6}ms ease`
+                : undefined,
             }}
           >
             {activeId ? (
@@ -220,10 +233,7 @@ export function Sidebar() {
               className="flex w-full items-center justify-between px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
             >
               <div className="flex items-center gap-2">
-                <DatabaseEngineIcon
-                  engine="postgres"
-                  className="h-3.5 w-3.5"
-                />
+                <DatabaseCylinderIcon className="h-3.5 w-3.5" />
                 <span>Connections</span>
                 {connections.length > 0 && (
                   <span className="rounded-full bg-muted px-1.5 text-[10px] tabular-nums">
@@ -249,7 +259,7 @@ export function Sidebar() {
               className="rounded p-1.5 hover:bg-accent text-muted-foreground"
               title="Connections"
             >
-              <DatabaseEngineIcon engine="postgres" className="h-4 w-4" />
+              <DatabaseCylinderIcon className="h-4 w-4" />
             </button>
           </div>
         )}

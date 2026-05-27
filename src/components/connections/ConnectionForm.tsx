@@ -4,6 +4,30 @@ import { db } from "@/lib/ipc";
 import type { ConnectionConfig } from "../../../shared/types";
 import { CheckCircle, XCircle, Loader2, Link } from "lucide-react";
 
+function defaultFormState(): {
+  name: string;
+  host: string;
+  port: string;
+  database: string;
+  user: string;
+  password: string;
+  ssl: boolean;
+  sslRejectUnauthorized: boolean;
+  engine: ConnectionConfig["engine"];
+} {
+  return {
+    name: "",
+    host: "localhost",
+    port: "5432",
+    database: "",
+    user: "postgres",
+    password: "",
+    ssl: false,
+    sslRejectUnauthorized: true,
+    engine: "postgres",
+  };
+}
+
 interface Props {
   connectionId: string | null;
   onClose: () => void;
@@ -17,7 +41,9 @@ function parseConnectionString(uri: string): Partial<ConnectionConfig> | null {
     const normalized = uri.replace(/^postgresql:\/\//, "postgres://");
     if (!normalized.startsWith("postgres://")) return null;
 
-    const url = new URL(normalized);
+    // Use http:// for parsing since postgres:// is not a "special" URL scheme
+    // and the URL constructor won't parse host/port/user/password for it
+    const url = new URL(normalized.replace(/^postgres:\/\//, "http://"));
     return {
       host: url.hostname || "localhost",
       port: parseInt(url.port, 10) || 5432,
@@ -30,6 +56,13 @@ function parseConnectionString(uri: string): Partial<ConnectionConfig> | null {
   } catch {
     return null;
   }
+}
+
+function detectEngine(host: string): ConnectionConfig["engine"] {
+  const h = host.toLowerCase();
+  if (h.includes("supabase")) return "supabase";
+  if (h.includes("rds.amazonaws.com") || h.includes("redshift.amazonaws.com") || h.includes("aws")) return "aws";
+  return "postgres";
 }
 
 function buildConnectionString(form: {
@@ -54,46 +87,53 @@ export function ConnectionForm({ connectionId, onClose }: Props) {
   const [connectionString, setConnectionString] = useState("");
   const [isLoading, setIsLoading] = useState(!!connectionId);
 
-  const [form, setForm] = useState({
-    name: "",
-    host: "localhost",
-    port: "5432",
-    database: "",
-    user: "postgres",
-    password: "",
-    ssl: false,
-    sslRejectUnauthorized: true,
-  });
+  const [form, setForm] = useState(defaultFormState);
 
-  // Fetch full connection config (with password) from main process when editing
   useEffect(() => {
-    if (!connectionId) return;
-    let cancelled = false;
-    db.getConnection(connectionId).then((conn) => {
-      if (cancelled) return;
-      setForm({
-        name: conn.name,
-        host: conn.host,
-        port: String(conn.port),
-        database: conn.database,
-        user: conn.user,
-        password: conn.password,
-        ssl: conn.ssl ?? false,
-        sslRejectUnauthorized: conn.sslRejectUnauthorized !== false,
-      });
-      setConnectionString(
-        buildConnectionString({
-          host: conn.host,
-          port: String(conn.port),
-          database: conn.database,
-          user: conn.user,
-          password: conn.password,
-          ssl: conn.ssl ?? false,
-        })
-      );
+    if (!connectionId) {
+      setForm(defaultFormState());
+      setConnectionString("");
       setIsLoading(false);
-    });
-    return () => { cancelled = true; };
+      return;
+    }
+
+    let cancelled = false;
+    setIsLoading(true);
+
+    db.getConnection(connectionId)
+      .then((c) => {
+        if (cancelled) return;
+        const next = {
+          name: c.name,
+          host: c.host,
+          port: String(c.port),
+          database: c.database,
+          user: c.user,
+          password: c.password,
+          ssl: c.ssl ?? false,
+          sslRejectUnauthorized: c.sslRejectUnauthorized !== false,
+          engine: c.engine,
+        };
+        setForm(next);
+        setConnectionString(
+          buildConnectionString({
+            host: c.host,
+            port: String(c.port),
+            database: c.database,
+            user: c.user,
+            password: c.password,
+            ssl: c.ssl ?? false,
+          })
+        );
+        setIsLoading(false);
+      })
+      .catch(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [connectionId]);
 
   const [testResult, setTestResult] = useState<{
@@ -107,14 +147,16 @@ export function ConnectionForm({ connectionId, onClose }: Props) {
     setConnectionString(uri);
     const parsed = parseConnectionString(uri);
     if (parsed) {
+      const newHost = parsed.host ?? form.host;
       setForm((f) => ({
         ...f,
-        host: parsed.host ?? f.host,
+        host: newHost,
         port: String(parsed.port ?? f.port),
         database: parsed.database ?? f.database,
         user: parsed.user ?? f.user,
         password: parsed.password ?? f.password,
         ssl: parsed.ssl ?? f.ssl,
+        engine: detectEngine(newHost),
       }));
     }
   }
@@ -130,7 +172,7 @@ export function ConnectionForm({ connectionId, onClose }: Props) {
   function buildConfig(): ConnectionConfig {
     return {
       id: connectionId ?? crypto.randomUUID(),
-      engine: "postgres",
+      engine: form.engine,
       name: form.name || `${form.host}/${form.database}`,
       host: form.host,
       port: parseInt(form.port, 10) || 5432,
@@ -138,7 +180,9 @@ export function ConnectionForm({ connectionId, onClose }: Props) {
       user: form.user,
       password: form.password,
       ssl: form.ssl,
-      sslRejectUnauthorized: form.sslRejectUnauthorized,
+      ...(form.ssl && {
+        sslRejectUnauthorized: form.sslRejectUnauthorized,
+      }),
     };
   }
 
@@ -254,7 +298,10 @@ export function ConnectionForm({ connectionId, onClose }: Props) {
               className={inputClass}
               placeholder="localhost"
               value={form.host}
-              onChange={(e) => setForm({ ...form, host: e.target.value })}
+              onChange={(e) => {
+                const host = e.target.value;
+                setForm({ ...form, host, engine: detectEngine(host) });
+              }}
             />
           </div>
           <div>
