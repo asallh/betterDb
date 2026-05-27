@@ -13,6 +13,17 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
 } from "lucide-react";
+import { parseVersion } from "../../../shared/version";
+
+const versionInfo = parseVersion(__APP_VERSION__);
+
+const STAGE_STYLES: Record<string, string> = {
+  nightly: "bg-purple-400/70 border-purple-500",
+  alpha: "bg-orange-400/70 border-orange-500",
+  beta: "bg-[#93D5FB]/70 border-[#3AA3E8]",
+  rc: "bg-yellow-400/70 border-yellow-500",
+  stable: "bg-green-400/70 border-green-500",
+};
 
 const MIN_WIDTH = 180;
 const MAX_WIDTH = 480;
@@ -122,9 +133,13 @@ export function Sidebar() {
             >
               <div className="flex min-w-0 items-center gap-1 pl-1 text-sm font-semibold tracking-tight">
                 <span className="min-2-0 truncate text-primary">BetterDB</span>
-                <span className="text-secondary text-[10px] mx-3 shrink-0 inline-flex items-center bg-[#93D5FB]/70 border border-[#3AA3E8] py-px px-1.5 rounded-full leading-none">
-                  Beta
-                </span>
+                {versionInfo.stage !== "stable" && (
+                  <span
+                    className={`text-secondary text-[10px] mx-3 shrink-0 inline-flex items-center border py-px px-1.5 rounded-full leading-none ${STAGE_STYLES[versionInfo.stage]}`}
+                  >
+                    {versionInfo.label}
+                  </span>
+                )}
               </div>
             </div>
             <div className="flex gap-0.5 shrink-0">

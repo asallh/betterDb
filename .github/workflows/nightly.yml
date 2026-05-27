@@ -1,0 +1,71 @@
+name: Nightly
+
+on:
+  schedule:
+    - cron: "0 6 * * *" # daily at 06:00 UTC
+  workflow_dispatch: # allow manual trigger
+
+permissions:
+  contents: write
+
+jobs:
+  nightly:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: dev
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Check for new commits since last nightly
+        id: check
+        run: |
+          git fetch --tags
+          latest_nightly=$(git tag -l 'v*-nightly.*' | sort -V | tail -1 || true)
+          if [ -n "$latest_nightly" ]; then
+            new_commits=$(git rev-list "${latest_nightly}..HEAD" --count 2>/dev/null || echo "1")
+          else
+            new_commits=1
+          fi
+          echo "new_commits=$new_commits" >> "$GITHUB_OUTPUT"
+
+      - name: Set nightly version
+        if: steps.check.outputs.new_commits != '0'
+        id: version
+        run: |
+          base=$(node -p "require('./package.json').version.split('-')[0]")
+          date=$(date -u +%Y%m%d)
+          echo "next=${base}-nightly.${date}" >> "$GITHUB_OUTPUT"
+
+      - name: Stamp version
+        if: steps.check.outputs.new_commits != '0'
+        run: npm version "${{ steps.version.outputs.next }}" --no-git-tag-version
+
+      - run: npm ci
+        if: steps.check.outputs.new_commits != '0'
+
+      - name: Build
+        if: steps.check.outputs.new_commits != '0'
+        run: npx tsc && npx vite build
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Tag nightly
+        if: steps.check.outputs.new_commits != '0'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "v${{ steps.version.outputs.next }}"
+          git push origin "v${{ steps.version.outputs.next }}"
+
+      - uses: softprops/action-gh-release@v2
+        if: steps.check.outputs.new_commits != '0'
+        with:
+          tag_name: v${{ steps.version.outputs.next }}
+          name: BetterDB v${{ steps.version.outputs.next }}
+          prerelease: true
+          generate_release_notes: true
