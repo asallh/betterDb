@@ -1,5 +1,10 @@
 import pg from "pg";
+import dns from "node:dns";
 import { DatabaseAdapter } from "./DatabaseAdapter";
+
+// Force IPv4 DNS resolution — many cloud Postgres hosts (Supabase, RDS) resolve
+// to IPv6 addresses that are unreachable on networks without IPv6 connectivity.
+dns.setDefaultResultOrder("ipv4first");
 import type {
   ConnectionConfig,
   TableInfo,
@@ -46,6 +51,12 @@ export class PostgresAdapter extends DatabaseAdapter {
     super(config);
   }
 
+  private buildSslOption(forceSsl?: boolean): false | { rejectUnauthorized: boolean } {
+    const useSsl = forceSsl ?? this.config.ssl;
+    if (!useSsl) return false;
+    return { rejectUnauthorized: this.config.sslRejectUnauthorized !== false };
+  }
+
   async connect(): Promise<void> {
     this.pool = new Pool({
       host: this.config.host,
@@ -53,13 +64,34 @@ export class PostgresAdapter extends DatabaseAdapter {
       database: this.config.database,
       user: this.config.user,
       password: this.config.password,
-      ssl: this.config.ssl ? { rejectUnauthorized: this.config.sslRejectUnauthorized !== false } : false,
+      ssl: this.buildSslOption(),
       max: 3,
       idleTimeoutMillis: 30000,
     });
-    // Verify connection works
-    const client = await this.pool.connect();
-    client.release();
+    try {
+      const client = await this.pool.connect();
+      client.release();
+    } catch (err: unknown) {
+      // If the server requires encryption and we didn't use SSL, retry with SSL
+      const msg = err instanceof Error ? err.message : "";
+      if (!this.config.ssl && msg.includes("no encryption")) {
+        await this.pool.end().catch(() => {});
+        this.pool = new Pool({
+          host: this.config.host,
+          port: this.config.port,
+          database: this.config.database,
+          user: this.config.user,
+          password: this.config.password,
+          ssl: { rejectUnauthorized: false },
+          max: 3,
+          idleTimeoutMillis: 30000,
+        });
+        const client = await this.pool.connect();
+        client.release();
+      } else {
+        throw err;
+      }
+    }
   }
 
   async disconnect(): Promise<void> {
@@ -313,6 +345,82 @@ export class PostgresAdapter extends DatabaseAdapter {
     }
   }
 
+  async truncateTable(schema: string, table: string): Promise<QueryResult> {
+    if (!this.pool) throw new Error("Not connected");
+    const sql = `TRUNCATE TABLE ${quoteIdent(schema)}.${quoteIdent(table)}`;
+    const start = performance.now();
+    try {
+      await this.pool.query(sql);
+      return { columns: [], rows: [], rowCount: 0, durationMs: Math.round(performance.now() - start) };
+    } catch (e: unknown) {
+      return { columns: [], rows: [], rowCount: 0, durationMs: Math.round(performance.now() - start), error: e instanceof Error ? e.message : String(e) };
+    }
+  }
+
+  async dropTable(schema: string, table: string, type: 'table' | 'view'): Promise<QueryResult> {
+    if (!this.pool) throw new Error("Not connected");
+    const keyword = type === 'view' ? 'VIEW' : 'TABLE';
+    const sql = `DROP ${keyword} ${quoteIdent(schema)}.${quoteIdent(table)}`;
+    const start = performance.now();
+    try {
+      await this.pool.query(sql);
+      return { columns: [], rows: [], rowCount: 0, durationMs: Math.round(performance.now() - start) };
+    } catch (e: unknown) {
+      return { columns: [], rows: [], rowCount: 0, durationMs: Math.round(performance.now() - start), error: e instanceof Error ? e.message : String(e) };
+    }
+  }
+
+  async dropSchema(schema: string, cascade: boolean): Promise<QueryResult> {
+    if (!this.pool) throw new Error("Not connected");
+    const sql = `DROP SCHEMA ${quoteIdent(schema)}${cascade ? ' CASCADE' : ''}`;
+    const start = performance.now();
+    try {
+      await this.pool.query(sql);
+      return { columns: [], rows: [], rowCount: 0, durationMs: Math.round(performance.now() - start) };
+    } catch (e: unknown) {
+      return { columns: [], rows: [], rowCount: 0, durationMs: Math.round(performance.now() - start), error: e instanceof Error ? e.message : String(e) };
+    }
+  }
+
+  async getIndexes(schema: string, table: string): Promise<{ name: string; columns: string; isUnique: boolean; isPrimary: boolean }[]> {
+    if (!this.pool) throw new Error("Not connected");
+    const res = await this.pool.query(
+      `SELECT i.relname AS index_name,
+              pg_get_indexdef(ix.indexrelid) AS index_def,
+              ix.indisunique AS is_unique,
+              ix.indisprimary AS is_primary
+       FROM pg_index ix
+       JOIN pg_class t ON t.oid = ix.indrelid
+       JOIN pg_class i ON i.oid = ix.indexrelid
+       JOIN pg_namespace n ON n.oid = t.relnamespace
+       WHERE n.nspname = $1 AND t.relname = $2
+       ORDER BY i.relname`,
+      [schema, table]
+    );
+    return res.rows.map((r) => ({
+      name: r.index_name,
+      columns: r.index_def,
+      isUnique: r.is_unique,
+      isPrimary: r.is_primary,
+    }));
+  }
+
+  async getTableSize(schema: string, table: string): Promise<{ totalSize: string; dataSize: string; indexSize: string }> {
+    if (!this.pool) throw new Error("Not connected");
+    const qualifiedName = `${quoteIdent(schema)}.${quoteIdent(table)}`;
+    const res = await this.pool.query(
+      `SELECT pg_size_pretty(pg_total_relation_size($1::regclass)) AS total_size,
+              pg_size_pretty(pg_relation_size($1::regclass)) AS data_size,
+              pg_size_pretty(pg_indexes_size($1::regclass)) AS index_size`,
+      [qualifiedName]
+    );
+    return {
+      totalSize: res.rows[0].total_size,
+      dataSize: res.rows[0].data_size,
+      indexSize: res.rows[0].index_size,
+    };
+  }
+
   async testConnection(): Promise<{ success: boolean; error?: string }> {
     const testPool = new Pool({
       host: this.config.host,
@@ -320,7 +428,7 @@ export class PostgresAdapter extends DatabaseAdapter {
       database: this.config.database,
       user: this.config.user,
       password: this.config.password,
-      ssl: this.config.ssl ? { rejectUnauthorized: this.config.sslRejectUnauthorized !== false } : false,
+      ssl: this.buildSslOption(),
       max: 1,
       connectionTimeoutMillis: 5000,
     });
@@ -330,9 +438,33 @@ export class PostgresAdapter extends DatabaseAdapter {
       await testPool.end();
       return { success: true };
     } catch (e: unknown) {
-      try {
-        await testPool.end();
-      } catch {}
+      await testPool.end().catch(() => {});
+      // If server requires encryption, retry with SSL
+      const msg = e instanceof Error ? e.message : "";
+      if (!this.config.ssl && msg.includes("no encryption")) {
+        const sslPool = new Pool({
+          host: this.config.host,
+          port: this.config.port,
+          database: this.config.database,
+          user: this.config.user,
+          password: this.config.password,
+          ssl: { rejectUnauthorized: false },
+          max: 1,
+          connectionTimeoutMillis: 5000,
+        });
+        try {
+          const client = await sslPool.connect();
+          client.release();
+          await sslPool.end();
+          return { success: true };
+        } catch (e2: unknown) {
+          await sslPool.end().catch(() => {});
+          return {
+            success: false,
+            error: e2 instanceof Error ? e2.message : String(e2),
+          };
+        }
+      }
       return {
         success: false,
         error: e instanceof Error ? e.message : String(e),

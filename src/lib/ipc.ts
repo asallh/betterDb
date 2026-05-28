@@ -7,6 +7,9 @@ import type {
   CellUpdate,
   RowDelete,
   RowInsert,
+  QueryHistoryEntry,
+  SavedQuery,
+  ExportRequest,
 } from "../../shared/types";
 
 export const db = {
@@ -39,8 +42,8 @@ export const db = {
     window.ipcRenderer.invoke("db:columns", schema, table),
 
   // Query execution
-  executeQuery: (sql: string): Promise<QueryResult> =>
-    window.ipcRenderer.invoke("db:query:execute", sql),
+  executeQuery: (sql: string, connectionId?: string): Promise<QueryResult> =>
+    window.ipcRenderer.invoke("db:query:execute", sql, connectionId),
 
   // Table data
   getTableData: (
@@ -61,4 +64,34 @@ export const db = {
     window.ipcRenderer.invoke("db:table:delete-row", params),
   insertRow: (params: RowInsert): Promise<QueryResult> =>
     window.ipcRenderer.invoke("db:table:insert-row", params),
+
+  // Schema/table operations
+  truncateTable: (schema: string, table: string): Promise<QueryResult> =>
+    window.ipcRenderer.invoke("db:table:truncate", schema, table),
+  dropTable: (schema: string, table: string, type: 'table' | 'view'): Promise<QueryResult> =>
+    window.ipcRenderer.invoke("db:table:drop", schema, table, type),
+  dropSchema: (schema: string, cascade: boolean): Promise<QueryResult> =>
+    window.ipcRenderer.invoke("db:schema:drop", schema, cascade),
+  getIndexes: (schema: string, table: string): Promise<{ name: string; columns: string; isUnique: boolean; isPrimary: boolean }[]> =>
+    window.ipcRenderer.invoke("db:table:indexes", schema, table),
+  getTableSize: (schema: string, table: string): Promise<{ totalSize: string; dataSize: string; indexSize: string }> =>
+    window.ipcRenderer.invoke("db:table:size", schema, table),
+
+  // Query history
+  getQueryHistory: (limit?: number): Promise<QueryHistoryEntry[]> =>
+    window.ipcRenderer.invoke("db:history:list", limit),
+  clearQueryHistory: (): Promise<void> =>
+    window.ipcRenderer.invoke("db:history:clear"),
+
+  // Saved queries
+  listSavedQueries: (): Promise<SavedQuery[]> =>
+    window.ipcRenderer.invoke("db:saved:list"),
+  saveQuery: (query: SavedQuery): Promise<void> =>
+    window.ipcRenderer.invoke("db:saved:save", query),
+  deleteSavedQuery: (id: string): Promise<void> =>
+    window.ipcRenderer.invoke("db:saved:delete", id),
+
+  // Export
+  exportData: (request: ExportRequest): Promise<{ success: boolean; filePath?: string; error?: string }> =>
+    window.ipcRenderer.invoke("db:export", request),
 };
