@@ -39,4 +39,10 @@ export abstract class DatabaseAdapter {
   abstract deleteRow(params: RowDelete): Promise<QueryResult>;
   abstract insertRow(params: RowInsert): Promise<QueryResult>;
   abstract getPrimaryKeys(schema: string, table: string): Promise<string[]>;
+
+  abstract truncateTable(schema: string, table: string): Promise<QueryResult>;
+  abstract dropTable(schema: string, table: string, type: 'table' | 'view'): Promise<QueryResult>;
+  abstract dropSchema(schema: string, cascade: boolean): Promise<QueryResult>;
+  abstract getIndexes(schema: string, table: string): Promise<{ name: string; columns: string; isUnique: boolean; isPrimary: boolean }[]>;
+  abstract getTableSize(schema: string, table: string): Promise<{ totalSize: string; dataSize: string; indexSize: string }>;
 }

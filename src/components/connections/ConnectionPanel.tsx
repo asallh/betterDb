@@ -11,31 +11,50 @@ import {
   Loader2,
   MoreVertical,
 } from "lucide-react";
+
 function ConnectionMenu({
   onEdit,
   onDelete,
   onClose,
+  anchorRef,
 }: {
   onEdit: () => void;
   onDelete: () => void;
   onClose: () => void;
+  anchorRef: React.RefObject<HTMLButtonElement>;
 }) {
   const menuRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+
+  useEffect(() => {
+    if (anchorRef.current) {
+      const rect = anchorRef.current.getBoundingClientRect();
+      setPos({ top: rect.bottom + 4, left: rect.right });
+    }
+  }, [anchorRef]);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(e.target as Node) &&
+        anchorRef.current &&
+        !anchorRef.current.contains(e.target as Node)
+      ) {
         onClose();
       }
     }
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
-  }, [onClose]);
+  }, [onClose, anchorRef]);
+
+  if (!pos) return null;
 
   return (
     <div
       ref={menuRef}
-      className="absolute right-0 top-full mt-1 z-50 min-w-[120px] rounded-md border border-border bg-popover p-1 shadow-md"
+      className="fixed z-50 min-w-[120px] rounded-md border border-border bg-popover p-1 shadow-lg"
+      style={{ top: pos.top, left: pos.left, transform: "translateX(-100%)" }}
     >
       <button
         onClick={() => {
@@ -116,6 +135,41 @@ function ConfirmDeleteDialog({
   );
 }
 
+function ConnectionFormModal({
+  connectionId,
+  onClose,
+}: {
+  connectionId: string | null;
+  onClose: () => void;
+}) {
+  const backdropRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  return (
+    <div
+      ref={backdropRef}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      onMouseDown={(e) => {
+        if (e.target === backdropRef.current) onClose();
+      }}
+    >
+      <div className="mx-4 w-full max-w-md rounded-lg border border-border bg-popover p-5 shadow-lg">
+        <h2 className="mb-4 text-sm font-semibold">
+          {connectionId ? "Edit Connection" : "New Connection"}
+        </h2>
+        <ConnectionForm connectionId={connectionId} onClose={onClose} />
+      </div>
+    </div>
+  );
+}
+
 export function ConnectionPanel() {
   const connections = useConnectionStore((s) => s.connections);
   const connect = useConnectionStore((s) => s.connect);
@@ -128,6 +182,7 @@ export function ConnectionPanel() {
   const [editingConnectionId, setEditingConnectionId] =
     useState<string | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+  const menuButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const [confirmDeleteConn, setConfirmDeleteConn] =
     useState<{ id: string; name: string } | null>(null);
 
@@ -196,6 +251,7 @@ export function ConnectionPanel() {
                   </button>
                 )}
                 <button
+                  ref={(el) => { menuButtonRefs.current[conn.id] = el; }}
                   onClick={() =>
                     setMenuOpenId(menuOpenId === conn.id ? null : conn.id)
                   }
@@ -206,7 +262,7 @@ export function ConnectionPanel() {
                 </button>
               </div>
 
-              {menuOpenId === conn.id && (
+              {menuOpenId === conn.id && menuButtonRefs.current[conn.id] && (
                 <ConnectionMenu
                   onEdit={() => {
                     setEditingConnectionId(conn.id);
@@ -214,6 +270,7 @@ export function ConnectionPanel() {
                   }}
                   onDelete={() => setConfirmDeleteConn({ id: conn.id, name: conn.name })}
                   onClose={() => setMenuOpenId(null)}
+                  anchorRef={{ current: menuButtonRefs.current[conn.id] } as React.RefObject<HTMLButtonElement>}
                 />
               )}
             </div>
@@ -227,27 +284,26 @@ export function ConnectionPanel() {
         )}
       </div>
 
-      {/* Add/Edit form */}
-      {showForm || editingConnectionId ? (
-        <div className="border-t border-border p-2">
-          <ConnectionForm
-            connectionId={editingConnectionId}
-            onClose={() => {
-              setShowForm(false);
-              setEditingConnectionId(null);
-            }}
-          />
-        </div>
-      ) : (
-        <div className="p-1.5 pt-0">
-          <button
-            onClick={() => setShowForm(true)}
-            className="flex w-full items-center justify-center gap-1.5 rounded border border-dashed border-border px-2 py-1.5 text-[11px] text-muted-foreground hover:border-primary hover:text-primary transition-colors"
-          >
-            <Plus className="h-3 w-3" />
-            New Connection
-          </button>
-        </div>
+      {/* New Connection button */}
+      <div className="p-1.5 pt-0">
+        <button
+          onClick={() => setShowForm(true)}
+          className="flex w-full items-center justify-center gap-1.5 rounded border border-dashed border-border px-2 py-1.5 text-[11px] text-muted-foreground hover:border-primary hover:text-primary transition-colors"
+        >
+          <Plus className="h-3 w-3" />
+          New Connection
+        </button>
+      </div>
+
+      {/* Connection form modal */}
+      {(showForm || editingConnectionId) && (
+        <ConnectionFormModal
+          connectionId={editingConnectionId}
+          onClose={() => {
+            setShowForm(false);
+            setEditingConnectionId(null);
+          }}
+        />
       )}
 
       {/* Confirm delete dialog */}
