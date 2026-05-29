@@ -60,13 +60,14 @@ function parseConnectionString(uri: string): Partial<ConnectionConfig> | null {
 
 function isCloudHost(host: string): boolean {
   const h = host.toLowerCase();
-  return h.includes("supabase") || h.includes("rds.amazonaws.com") || h.includes("redshift.amazonaws.com") || h.includes("neon.tech") || h.includes("aivencloud.com");
+  return h.includes("supabase") || h.includes("rds.amazonaws.com") || h.includes("redshift.amazonaws.com") || h.includes("neon.tech") || h.includes("aivencloud.com") || h.includes("databricks");
 }
 
 function detectEngine(host: string): ConnectionConfig["engine"] {
   const h = host.toLowerCase();
   if (h.includes("supabase")) return "supabase";
   if (h.includes("rds.amazonaws.com") || h.includes("redshift.amazonaws.com") || h.includes("aws")) return "aws";
+  if (h.includes("databricks")) return "databricks";
   return "postgres";
 }
 

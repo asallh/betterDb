@@ -1,7 +1,7 @@
 export interface ConnectionConfig {
   id: string;
   name: string;
-  engine: 'postgres' | 'supabase' | 'aws';
+  engine: 'postgres' | 'supabase' | 'aws' | 'databricks';
   host: string;
   port: number;
   database: string;
