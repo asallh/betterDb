@@ -32,7 +32,7 @@ export function registerIpcHandlers(manager: ConnectionManager): void {
   // -- Connection management --
   ipcMain.handle(IPC.CONNECTIONS_LIST, async () => {
     const connections = await loadConnections();
-    // Strip passwords from listing — renderer doesn't need them for display
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     return connections.map(({ password: _, ...rest }) => ({
       ...rest,
       password: "",
@@ -116,7 +116,7 @@ export function registerIpcHandlers(manager: ConnectionManager): void {
         rowCount: result.rowCount,
         error: result.error,
       };
-      addHistoryEntry(entry).catch(() => {});
+      addHistoryEntry(entry).catch(() => { });
 
       return result;
     }
