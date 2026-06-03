@@ -1,7 +1,7 @@
 export interface ConnectionConfig {
   id: string;
   name: string;
-  engine: 'postgres' | 'supabase' | 'aws';
+  engine: 'postgres' | 'supabase' | 'aws' | 'databricks';
   host: string;
   port: number;
   database: string;
@@ -68,4 +68,30 @@ export interface RowInsert {
   schema: string;
   table: string;
   values: Record<string, unknown>;
+}
+
+export interface QueryHistoryEntry {
+  id: string;
+  sql: string;
+  connectionId: string;
+  executedAt: string;
+  durationMs: number;
+  rowCount: number;
+  error?: string;
+}
+
+export interface SavedQuery {
+  id: string;
+  name: string;
+  sql: string;
+  connectionId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ExportRequest {
+  format: "csv" | "json";
+  columns: string[];
+  rows: Record<string, unknown>[];
+  suggestedName?: string;
 }

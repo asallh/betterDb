@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { QueryResult } from "../../shared/types";
 import { db } from "@/lib/ipc";
+import { useConnectionStore } from "./connectionStore";
 
 export interface QueryTab {
   id: string;
@@ -70,7 +71,8 @@ export const useQueryStore = create<QueryStore>((set, get) => {
       }));
 
       try {
-        const result = await db.executeQuery(tab.sql);
+        const connectionId = useConnectionStore.getState().activeConnectionId;
+        const result = await db.executeQuery(tab.sql, connectionId ?? undefined);
         set((s) => ({
           tabs: s.tabs.map((t) =>
             t.id === id ? { ...t, isExecuting: false, result } : t

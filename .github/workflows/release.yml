@@ -1,0 +1,102 @@
+name: Release
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  gate:
+    if: |
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.head.ref == 'dev' &&
+      github.event.pull_request.base.ref == 'main'
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.pkg.outputs.version }}
+      prerelease: ${{ steps.pkg.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: pkg
+        run: |
+          version=$(node -p "require('./package.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if echo "$version" | grep -q '-'; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Fail if version is placeholder
+        run: |
+          if [ "${{ steps.pkg.outputs.version }}" = "0.0.0" ]; then
+            echo "::error::Bump package.json on dev before merging to main"
+            exit 1
+          fi
+
+      - name: Fail if tag already exists
+        run: |
+          git fetch --tags
+          if git rev-parse "v${{ steps.pkg.outputs.version }}" >/dev/null 2>&1; then
+            echo "::error::Tag v${{ steps.pkg.outputs.version }} already exists"
+            exit 1
+          fi
+
+  build:
+    needs: gate
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            platform: mac
+          - os: windows-latest
+            platform: win
+          - os: ubuntu-latest
+            platform: linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npx tsc --noEmit
+
+      - name: Build installers
+        run: npm run build
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: betterdb-${{ needs.gate.outputs.version }}-${{ matrix.platform }}
+          path: |
+            release/${{ needs.gate.outputs.version }}/**/*
+          if-no-files-found: error
+
+  publish:
+    needs: [gate, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: betterdb-${{ needs.gate.outputs.version }}-*
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.gate.outputs.version }}
+          name: BetterDB v${{ needs.gate.outputs.version }}
+          prerelease: ${{ needs.gate.outputs.prerelease == 'true' }}
+          generate_release_notes: true
+          files: artifacts/**/*

@@ -58,10 +58,16 @@ function parseConnectionString(uri: string): Partial<ConnectionConfig> | null {
   }
 }
 
+function isCloudHost(host: string): boolean {
+  const h = host.toLowerCase();
+  return h.includes("supabase") || h.includes("rds.amazonaws.com") || h.includes("redshift.amazonaws.com") || h.includes("neon.tech") || h.includes("aivencloud.com") || h.includes("databricks");
+}
+
 function detectEngine(host: string): ConnectionConfig["engine"] {
   const h = host.toLowerCase();
   if (h.includes("supabase")) return "supabase";
   if (h.includes("rds.amazonaws.com") || h.includes("redshift.amazonaws.com") || h.includes("aws")) return "aws";
+  if (h.includes("databricks")) return "databricks";
   return "postgres";
 }
 
@@ -148,6 +154,7 @@ export function ConnectionForm({ connectionId, onClose }: Props) {
     const parsed = parseConnectionString(uri);
     if (parsed) {
       const newHost = parsed.host ?? form.host;
+      const cloud = isCloudHost(newHost);
       setForm((f) => ({
         ...f,
         host: newHost,
@@ -155,7 +162,8 @@ export function ConnectionForm({ connectionId, onClose }: Props) {
         database: parsed.database ?? f.database,
         user: parsed.user ?? f.user,
         password: parsed.password ?? f.password,
-        ssl: parsed.ssl ?? f.ssl,
+        ssl: cloud ? true : (parsed.ssl ?? f.ssl),
+        sslRejectUnauthorized: cloud ? false : f.sslRejectUnauthorized,
         engine: detectEngine(newHost),
       }));
     }
@@ -300,7 +308,14 @@ export function ConnectionForm({ connectionId, onClose }: Props) {
               value={form.host}
               onChange={(e) => {
                 const host = e.target.value;
-                setForm({ ...form, host, engine: detectEngine(host) });
+                const cloud = isCloudHost(host);
+                setForm({
+                  ...form,
+                  host,
+                  engine: detectEngine(host),
+                  ssl: cloud ? true : form.ssl,
+                  sslRejectUnauthorized: cloud ? false : form.sslRejectUnauthorized,
+                });
               }}
             />
           </div>

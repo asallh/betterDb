@@ -1,0 +1,176 @@
+name: Release PR
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: release-bump-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    if: |
+      github.event.pull_request.head.ref == 'dev' &&
+      github.event.pull_request.base.ref == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Determine release type from labels
+        id: bump
+        env:
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: |
+          set -euo pipefail
+
+          if echo "$LABELS" | tr ',' '\n' | grep -q '^release:skip$'; then
+            echo "::error::This PR is marked release:skip"
+            exit 1
+          fi
+
+          # Check semver bump labels
+          count_major=$(echo "$LABELS" | tr ',' '\n' | grep -c '^release:major$' || true)
+          count_minor=$(echo "$LABELS" | tr ',' '\n' | grep -c '^release:minor$' || true)
+          count_patch=$(echo "$LABELS" | tr ',' '\n' | grep -c '^release:patch$' || true)
+          semver_total=$((count_major + count_minor + count_patch))
+
+          # Check stage labels
+          has_alpha=$(echo "$LABELS" | tr ',' '\n' | grep -c '^release:alpha$' || true)
+          has_beta=$(echo "$LABELS" | tr ',' '\n' | grep -c '^release:beta$' || true)
+          has_rc=$(echo "$LABELS" | tr ',' '\n' | grep -c '^release:rc$' || true)
+          stage_total=$((has_alpha + has_beta + has_rc))
+
+          if [ "$semver_total" -ne 1 ]; then
+            echo "::error::Add exactly one semver label: release:patch, release:minor, or release:major"
+            exit 1
+          fi
+          if [ "$stage_total" -gt 1 ]; then
+            echo "::error::Add at most one stage label: release:alpha, release:beta, or release:rc"
+            exit 1
+          fi
+
+          if [ "$count_major" -eq 1 ]; then echo "level=major" >> "$GITHUB_OUTPUT"
+          elif [ "$count_minor" -eq 1 ]; then echo "level=minor" >> "$GITHUB_OUTPUT"
+          else echo "level=patch" >> "$GITHUB_OUTPUT"
+          fi
+
+          if [ "$has_alpha" -eq 1 ]; then echo "stage=alpha" >> "$GITHUB_OUTPUT"
+          elif [ "$has_beta" -eq 1 ]; then echo "stage=beta" >> "$GITHUB_OUTPUT"
+          elif [ "$has_rc" -eq 1 ]; then echo "stage=rc" >> "$GITHUB_OUTPUT"
+          else echo "stage=stable" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Compute next version from tags on main
+        id: version
+        run: |
+          git fetch origin main --tags
+
+          stage="${{ steps.bump.outputs.stage }}"
+
+          # Get the latest stable tag for the semver base
+          latest_stable=$(git tag -l 'v*' --merged origin/main | grep -v '-' | sort -V | tail -1 || true)
+          latest_stable=${latest_stable#v}
+          latest_stable=${latest_stable:-0.0.0}
+          IFS=. read -r major minor patch <<< "$latest_stable"
+
+          case "${{ steps.bump.outputs.level }}" in
+            major) major=$((major+1)); minor=0; patch=0 ;;
+            minor) minor=$((minor+1)); patch=0 ;;
+            patch) patch=$((patch+1)) ;;
+          esac
+
+          base="${major}.${minor}.${patch}"
+
+          if [ "$stage" = "stable" ]; then
+            echo "next=${base}" >> "$GITHUB_OUTPUT"
+          else
+            # Find the latest prerelease tag for this base+stage and increment
+            existing=$(git tag -l "v${base}-${stage}.*" | sort -V | tail -1 || true)
+            if [ -n "$existing" ]; then
+              pre_num=$(echo "$existing" | grep -oE '[0-9]+$')
+              pre_num=$((pre_num + 1))
+            else
+              pre_num=1
+            fi
+            echo "next=${base}-${stage}.${pre_num}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Bump version on dev
+        id: bump_dev
+        run: |
+          set -euo pipefail
+          current=$(node -p "require('./package.json').version")
+          next="${{ steps.version.outputs.next }}"
+
+          if [ "$current" = "$next" ]; then
+            echo "bumped=false" >> "$GITHUB_OUTPUT"
+            echo "Already at v$next on dev"
+            exit 0
+          fi
+
+          npm version "$next" --no-git-tag-version
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          git commit -m "chore(release): v$next"
+          git push origin HEAD:dev
+          echo "bumped=true" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const marker = '<!-- release-pr-bot -->';
+            const bumped = '${{ steps.bump_dev.outputs.bumped }}' === 'true';
+            const stage = '${{ steps.bump.outputs.stage }}';
+            const stageNote = stage !== 'stable' ? ` (${stage} prerelease)` : '';
+            const versionStatus = bumped
+              ? '- [x] `package.json` / `package-lock.json` bumped on **dev** by github-actions[bot]'
+              : '- [x] `package.json` on **dev** already matches the planned version';
+            const body = [
+              '### Release checklist',
+              `- **Planned version:** \`v${{ steps.version.outputs.next }}\` (${{ steps.bump.outputs.level }} bump${stageNote})`,
+              versionStatus,
+              '- [ ] Changelog / PR description lists user-facing changes',
+              '- [ ] CI checks pass',
+              '- [ ] After merge, the **Release** workflow tags `main` and publishes installers to GitHub Releases',
+              '',
+              marker,
+            ].join('\n');
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find((c) => c.body?.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
