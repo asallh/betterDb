@@ -14,6 +14,7 @@
   <img src="https://img.shields.io/badge/Electron-191970?style=for-the-badge&logo=Electron&logoColor=white" alt="Electron" />
   <img src="https://img.shields.io/badge/shadcn/ui-%23000000.svg?style=for-the-badge&logo=shadcnui&logoColor=white" alt="shadcn/ui" />
   <img src="https://img.shields.io/badge/tailwindcss-%2338B2AC.svg?style=for-the-badge&logo=tailwind-css&logoColor=white" alt="Tailwind CSS" />
+  <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="LICENSE" />
 </p>
 
 ---
@@ -59,16 +60,16 @@ shared/
 
 ## Tech Stack
 
-| Layer | Technology |
-|---|---|
-| Framework | Electron 30 |
-| Frontend | React 18, TypeScript |
-| Bundler | Vite 5 with `vite-plugin-electron` |
-| Styling | Tailwind CSS, shadcn/ui |
-| State | Zustand |
-| Editor | CodeMirror 6 |
-| Tables | @tanstack/react-virtual |
-| Database | node-postgres (`pg`) |
+| Layer     | Technology                         |
+| --------- | ---------------------------------- |
+| Framework | Electron 30                        |
+| Frontend  | React 18, TypeScript               |
+| Bundler   | Vite 5 with `vite-plugin-electron` |
+| Styling   | Tailwind CSS, shadcn/ui            |
+| State     | Zustand                            |
+| Editor    | CodeMirror 6                       |
+| Tables    | @tanstack/react-virtual            |
+| Database  | node-postgres (`pg`)               |
 
 ## Getting Started
 
@@ -110,4 +111,4 @@ npm run lint
 
 ## License
 
-This project is not currently licensed for distribution. All rights reserved.
+MIT © [asallh](https://github.com/asallh). See [LICENSE](LICENSE) for the full text.
