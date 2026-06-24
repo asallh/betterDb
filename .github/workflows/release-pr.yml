@@ -131,6 +131,11 @@ jobs:
           git push origin HEAD:dev
           echo "bumped=true" >> "$GITHUB_OUTPUT"
 
+      - run: npm ci
+      - run: npm run lint
+      - run: npx tsc --noEmit
+      - run: npx vite build
+
       - uses: actions/github-script@v7
         with:
           script: |
