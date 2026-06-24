@@ -83,7 +83,9 @@ jobs:
         with:
           name: betterdb-${{ needs.gate.outputs.version }}-${{ matrix.platform }}
           path: |
-            release/${{ needs.gate.outputs.version }}/**/*
+            release/${{ needs.gate.outputs.version }}/*.dmg
+            release/${{ needs.gate.outputs.version }}/*.exe
+            release/${{ needs.gate.outputs.version }}/*.AppImage
           if-no-files-found: error
 
   publish:
@@ -103,4 +105,7 @@ jobs:
           name: BetterDB v${{ needs.gate.outputs.version }}
           prerelease: ${{ needs.gate.outputs.prerelease == 'true' }}
           generate_release_notes: true
-          files: artifacts/**/*
+          files: |
+            artifacts/*.dmg
+            artifacts/*.exe
+            artifacts/*.AppImage
