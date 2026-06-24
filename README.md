@@ -5,7 +5,7 @@
 <h1 align="center">BetterDB</h1>
 
 <p align="center">
-  A modern, cross-platform PostgreSQL database client built with Electron, React, and TypeScript.
+  A modern, cross-platform SQL database client built with Electron, React, and TypeScript.
 </p>
 
 <p align="center">
@@ -21,11 +21,11 @@
 
 ## About
 
-BetterDB is a lightweight desktop application for managing PostgreSQL databases. It provides an intuitive interface for browsing schemas, writing queries, and editing data — without the bloat of traditional database GUIs.
+BetterDB is a lightweight desktop application for managing PostgreSQL and SQL Server databases. It provides an intuitive interface for browsing schemas, writing queries, and editing data — without the bloat of traditional database GUIs.
 
 ## Features
 
-- **Connection Manager** — Save and organize multiple PostgreSQL connections with SSL support. Compatible with Supabase and AWS RDS.
+- **Connection Manager** — Save and organize PostgreSQL and SQL Server connections with encryption/SSL support. PostgreSQL-compatible hosts include Supabase and AWS RDS.
 - **Schema Explorer** — Browse databases, schemas, tables, and views in a collapsible tree sidebar.
 - **SQL Editor** — Write and execute queries with a CodeMirror-powered editor featuring SQL syntax highlighting and a dark theme.
 - **Query Results** — View results in a fast, virtualized table with column type awareness and execution time metrics.
@@ -40,6 +40,7 @@ electron/
   ├── db/
   │   ├── DatabaseAdapter.ts      # Abstract adapter (extensible to other engines)
   │   ├── PostgresAdapter.ts      # PostgreSQL implementation via node-postgres
+  │   ├── SqlServerAdapter.ts     # SQL Server implementation via mssql
   │   └── ConnectionManager.ts    # Singleton connection factory
   ├── ipc/
   │   └── handlers.ts             # IPC bridge between main & renderer
@@ -69,7 +70,7 @@ shared/
 | State     | Zustand                            |
 | Editor    | CodeMirror 6                       |
 | Tables    | @tanstack/react-virtual            |
-| Database  | node-postgres (`pg`)               |
+| Database  | node-postgres (`pg`), `mssql`      |
 
 ## Getting Started
 

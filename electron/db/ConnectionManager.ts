@@ -1,5 +1,6 @@
 import { DatabaseAdapter } from "./DatabaseAdapter";
 import { PostgresAdapter } from "./PostgresAdapter";
+import { SqlServerAdapter } from "./SqlServerAdapter";
 import type { ConnectionConfig } from "../../shared/types";
 
 export class ConnectionManager {
@@ -7,8 +8,11 @@ export class ConnectionManager {
   private activeConnectionId: string | null = null;
 
   createAdapter(config: ConnectionConfig): DatabaseAdapter {
-    // All engines are PostgreSQL-compatible (Supabase, AWS RDS, etc.)
-    // The engine field only determines the UI icon
+    if (config.engine === "sqlserver") {
+      return new SqlServerAdapter(config);
+    }
+
+    // Supabase, AWS RDS, and Databricks continue through the PostgreSQL-compatible path.
     return new PostgresAdapter(config);
   }
 

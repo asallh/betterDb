@@ -95,6 +95,20 @@ export function DatabricksIcon({ className = "h-4 w-4", colored = false }: IconP
   );
 }
 
+/* ─── SQL Server ─── */
+export function SqlServerIcon({ className = "h-4 w-4", colored = false }: IconProps) {
+  const fill = colored ? "#A91D22" : "currentColor";
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none">
+      <ellipse cx="12" cy="5" rx="8" ry="3" fill={fill} opacity={colored ? "0.9" : "1"} />
+      <path d="M4 5v10c0 1.66 3.58 3 8 3s8-1.34 8-3V5" stroke={fill} strokeWidth="2" />
+      <path d="M4 10c0 1.66 3.58 3 8 3s8-1.34 8-3" stroke={fill} strokeWidth="2" />
+      <path d="M4 15c0 1.66 3.58 3 8 3s8-1.34 8-3" stroke={fill} strokeWidth="2" />
+      <path d="M17 3.5l2.5-2.5M18.5 6l3-1M16.5 8l2.5 2" stroke={colored ? "#F25022" : "currentColor"} strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 /* ─── Generic cylinder fallback ─── */
 export function DatabaseCylinderIcon({ className = "h-4 w-4" }: IconProps) {
   return (
@@ -131,6 +145,8 @@ export function DatabaseEngineIcon({
       return <AwsIcon className={className} colored={colored} />;
     case "databricks":
       return <DatabricksIcon className={className} colored={colored} />;
+    case "sqlserver":
+      return <SqlServerIcon className={className} colored={colored} />;
     case "postgres":
     default:
       return <PostgresIcon className={className} colored={colored} />;
