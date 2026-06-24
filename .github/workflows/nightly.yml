@@ -9,12 +9,17 @@ permissions:
   contents: write
 
 jobs:
-  nightly:
+  prepare:
     runs-on: ubuntu-latest
+    outputs:
+      should_run: ${{ steps.check.outputs.new_commits != '0' }}
+      version: ${{ steps.version.outputs.next }}
+      commit_sha: ${{ steps.version.outputs.commit_sha }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: dev
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -39,33 +44,89 @@ jobs:
         run: |
           base=$(node -p "require('./package.json').version.split('-')[0]")
           date=$(date -u +%Y%m%d)
-          echo "next=${base}-nightly.${date}" >> "$GITHUB_OUTPUT"
+          next="${base}-nightly.${date}.${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}"
+          echo "next=${next}" >> "$GITHUB_OUTPUT"
+          echo "commit_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+          git fetch --tags
+          if git rev-parse "v${next}" >/dev/null 2>&1; then
+            echo "::error::Tag v${next} already exists"
+            exit 1
+          fi
+
+  build:
+    needs: prepare
+    if: needs.prepare.outputs.should_run == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            platform: mac
+            builder-target: mac
+          - os: windows-latest
+            platform: win
+            builder-target: win
+          - os: ubuntu-latest
+            platform: linux
+            builder-target: linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: dev
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
 
       - name: Stamp version
-        if: steps.check.outputs.new_commits != '0'
-        run: npm version "${{ steps.version.outputs.next }}" --no-git-tag-version
+        run: npm version "${{ needs.prepare.outputs.version }}" --no-git-tag-version
 
       - run: npm ci
-        if: steps.check.outputs.new_commits != '0'
+      - run: npm run lint
+      - run: npx tsc --noEmit
 
-      - name: Build
-        if: steps.check.outputs.new_commits != '0'
-        run: npx tsc && npx vite build
+      - name: Build installers
+        run: npm run build -- --${{ matrix.builder-target }}
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: betterdb-${{ needs.prepare.outputs.version }}-${{ matrix.platform }}
+          path: |
+            release/${{ needs.prepare.outputs.version }}/**/*
+          if-no-files-found: error
+
+  publish:
+    needs: [prepare, build]
+    if: needs.prepare.outputs.should_run == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.commit_sha }}
+
       - name: Tag nightly
-        if: steps.check.outputs.new_commits != '0'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag "v${{ steps.version.outputs.next }}"
-          git push origin "v${{ steps.version.outputs.next }}"
+          git tag "v${{ needs.prepare.outputs.version }}"
+          git push origin "v${{ needs.prepare.outputs.version }}"
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: betterdb-${{ needs.prepare.outputs.version }}-*
+          merge-multiple: true
 
       - uses: softprops/action-gh-release@v2
-        if: steps.check.outputs.new_commits != '0'
         with:
-          tag_name: v${{ steps.version.outputs.next }}
-          name: BetterDB v${{ steps.version.outputs.next }}
+          tag_name: v${{ needs.prepare.outputs.version }}
+          target_commitish: ${{ needs.prepare.outputs.commit_sha }}
+          name: BetterDB v${{ needs.prepare.outputs.version }}
           prerelease: true
           generate_release_notes: true
+          files: artifacts/**/*
