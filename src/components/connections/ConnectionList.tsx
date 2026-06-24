@@ -60,7 +60,7 @@ export function ConnectionList() {
         <DatabaseEngineIcon engine="postgres" className="mx-auto h-12 w-12 text-primary" />
         <h1 className="mt-4 text-2xl font-bold">BetterDB</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Connect to a PostgreSQL database
+          Connect to PostgreSQL or SQL Server
         </p>
       </div>
 
