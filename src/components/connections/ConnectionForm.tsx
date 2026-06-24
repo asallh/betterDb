@@ -13,6 +13,7 @@ function defaultFormState(): {
   password: string;
   ssl: boolean;
   sslRejectUnauthorized: boolean;
+    trustServerCertificate: boolean;
   engine: ConnectionConfig["engine"];
 } {
   return {
@@ -24,6 +25,7 @@ function defaultFormState(): {
     password: "",
     ssl: false,
     sslRejectUnauthorized: true,
+    trustServerCertificate: false,
     engine: "postgres",
   };
 }
@@ -35,23 +37,49 @@ interface Props {
 
 type FormMode = "fields" | "uri";
 
+function isPostgresEngine(engine: ConnectionConfig["engine"]): boolean {
+  return engine !== "sqlserver";
+}
+
+function getDefaultPort(engine: ConnectionConfig["engine"]): number {
+  return engine === "sqlserver" ? 1433 : 5432;
+}
+
+function getDefaultUser(engine: ConnectionConfig["engine"]): string {
+  return engine === "sqlserver" ? "sa" : "postgres";
+}
+
 function parseConnectionString(uri: string): Partial<ConnectionConfig> | null {
   try {
-    // Handle postgres:// and postgresql://
-    const normalized = uri.replace(/^postgresql:\/\//, "postgres://");
-    if (!normalized.startsWith("postgres://")) return null;
+    const scheme = uri.match(/^([a-z]+):\/\//i)?.[1]?.toLowerCase();
+    const engine =
+      scheme === "sqlserver" || scheme === "mssql"
+        ? "sqlserver"
+        : scheme === "postgres" || scheme === "postgresql"
+          ? "postgres"
+          : null;
 
-    // Use http:// for parsing since postgres:// is not a "special" URL scheme
-    // and the URL constructor won't parse host/port/user/password for it
-    const url = new URL(normalized.replace(/^postgres:\/\//, "http://"));
+    if (!engine) return null;
+
+    // Use http:// for parsing since database URL schemes are not all "special"
+    // URL schemes and can otherwise parse credentials/host inconsistently.
+    const url = new URL(uri.replace(/^[a-z]+:\/\//i, "http://"));
+    const defaultPort = getDefaultPort(engine);
+    const defaultUser = getDefaultUser(engine);
+
     return {
+      engine,
       host: url.hostname || "localhost",
-      port: parseInt(url.port, 10) || 5432,
-      database: url.pathname.replace(/^\//, "") || "postgres",
-      user: url.username || "postgres",
+      port: parseInt(url.port, 10) || defaultPort,
+      database: url.pathname.replace(/^\//, "") || (engine === "sqlserver" ? "" : "postgres"),
+      user: url.username || defaultUser,
       password: decodeURIComponent(url.password || ""),
       ssl: url.searchParams.get("sslmode") === "require" ||
-        url.searchParams.get("ssl") === "true",
+        url.searchParams.get("ssl") === "true" ||
+        url.searchParams.get("encrypt") === "true",
+      trustServerCertificate:
+        url.searchParams.get("trustServerCertificate") === "true" ||
+        url.searchParams.get("trustServerCertificate") === "1",
     };
   } catch {
     return null;
@@ -65,6 +93,7 @@ function isCloudHost(host: string): boolean {
 
 function detectEngine(host: string): ConnectionConfig["engine"] {
   const h = host.toLowerCase();
+  if (h.includes("database.windows.net")) return "sqlserver";
   if (h.includes("supabase")) return "supabase";
   if (h.includes("rds.amazonaws.com") || h.includes("redshift.amazonaws.com") || h.includes("aws")) return "aws";
   if (h.includes("databricks")) return "databricks";
@@ -78,10 +107,20 @@ function buildConnectionString(form: {
   user: string;
   password: string;
   ssl: boolean;
+  trustServerCertificate?: boolean;
+  engine: ConnectionConfig["engine"];
 }): string {
   const pass = form.password ? `:${encodeURIComponent(form.password)}` : "";
-  const ssl = form.ssl ? "?sslmode=require" : "";
-  return `postgresql://${form.user}${pass}@${form.host}:${form.port}/${form.database}${ssl}`;
+  const scheme = form.engine === "sqlserver" ? "sqlserver" : "postgresql";
+  const params = new URLSearchParams();
+  if (form.engine === "sqlserver") {
+    if (form.ssl) params.set("encrypt", "true");
+    if (form.trustServerCertificate) params.set("trustServerCertificate", "true");
+  } else if (form.ssl) {
+    params.set("sslmode", "require");
+  }
+  const query = params.size > 0 ? `?${params.toString()}` : "";
+  return `${scheme}://${form.user}${pass}@${form.host}:${form.port}/${form.database}${query}`;
 }
 
 export function ConnectionForm({ connectionId, onClose }: Props) {
@@ -118,6 +157,8 @@ export function ConnectionForm({ connectionId, onClose }: Props) {
           password: c.password,
           ssl: c.ssl ?? false,
           sslRejectUnauthorized: c.sslRejectUnauthorized !== false,
+          trustServerCertificate:
+            c.trustServerCertificate ?? c.sslRejectUnauthorized === false,
           engine: c.engine,
         };
         setForm(next);
@@ -129,6 +170,8 @@ export function ConnectionForm({ connectionId, onClose }: Props) {
             user: c.user,
             password: c.password,
             ssl: c.ssl ?? false,
+            trustServerCertificate: c.trustServerCertificate,
+            engine: c.engine,
           })
         );
         setIsLoading(false);
@@ -155,6 +198,7 @@ export function ConnectionForm({ connectionId, onClose }: Props) {
     if (parsed) {
       const newHost = parsed.host ?? form.host;
       const cloud = isCloudHost(newHost);
+      const nextEngine = parsed.engine ?? detectEngine(newHost);
       setForm((f) => ({
         ...f,
         host: newHost,
@@ -162,9 +206,12 @@ export function ConnectionForm({ connectionId, onClose }: Props) {
         database: parsed.database ?? f.database,
         user: parsed.user ?? f.user,
         password: parsed.password ?? f.password,
-        ssl: cloud ? true : (parsed.ssl ?? f.ssl),
-        sslRejectUnauthorized: cloud ? false : f.sslRejectUnauthorized,
-        engine: detectEngine(newHost),
+        ssl: nextEngine === "sqlserver" ? (parsed.ssl ?? f.ssl) : cloud ? true : (parsed.ssl ?? f.ssl),
+        sslRejectUnauthorized:
+          nextEngine === "sqlserver" ? f.sslRejectUnauthorized : cloud ? false : f.sslRejectUnauthorized,
+        trustServerCertificate:
+          parsed.trustServerCertificate ?? f.trustServerCertificate,
+        engine: nextEngine,
       }));
     }
   }
@@ -183,13 +230,16 @@ export function ConnectionForm({ connectionId, onClose }: Props) {
       engine: form.engine,
       name: form.name || `${form.host}/${form.database}`,
       host: form.host,
-      port: parseInt(form.port, 10) || 5432,
+      port: parseInt(form.port, 10) || getDefaultPort(form.engine),
       database: form.database,
       user: form.user,
       password: form.password,
       ssl: form.ssl,
-      ...(form.ssl && {
+      ...(isPostgresEngine(form.engine) && form.ssl && {
         sslRejectUnauthorized: form.sslRejectUnauthorized,
+      }),
+      ...(form.engine === "sqlserver" && {
+        trustServerCertificate: form.trustServerCertificate,
       }),
     };
   }
@@ -261,7 +311,7 @@ export function ConnectionForm({ connectionId, onClose }: Props) {
             <textarea
               className={`${inputClass} resize-none font-mono`}
               rows={2}
-              placeholder="postgresql://user:password@host:5432/dbname?sslmode=require"
+              placeholder="postgresql://user:password@host:5432/dbname?sslmode=require or sqlserver://user:password@host:1433/dbname?encrypt=true"
               value={connectionString}
               onChange={(e) => applyUri(e.target.value)}
               spellCheck={false}
@@ -289,6 +339,38 @@ export function ConnectionForm({ connectionId, onClose }: Props) {
         <div className="grid grid-cols-2 gap-2">
           <div className="col-span-2">
             <label className="mb-0.5 block text-[11px] text-muted-foreground">
+              Database Engine
+            </label>
+            <select
+              className={inputClass}
+              value={form.engine}
+              onChange={(e) => {
+                const engine = e.target.value as ConnectionConfig["engine"];
+                const previousDefaultPort = String(getDefaultPort(form.engine));
+                const previousDefaultUser = getDefaultUser(form.engine);
+                setForm({
+                  ...form,
+                  engine,
+                  port:
+                    form.port === previousDefaultPort
+                      ? String(getDefaultPort(engine))
+                      : form.port,
+                  user:
+                    form.user === previousDefaultUser
+                      ? getDefaultUser(engine)
+                      : form.user,
+                });
+              }}
+            >
+              <option value="postgres">PostgreSQL</option>
+              <option value="supabase">Supabase</option>
+              <option value="aws">AWS/RDS PostgreSQL</option>
+              <option value="databricks">Databricks</option>
+              <option value="sqlserver">SQL Server</option>
+            </select>
+          </div>
+          <div className="col-span-2">
+            <label className="mb-0.5 block text-[11px] text-muted-foreground">
               Connection Name
             </label>
             <input
@@ -309,12 +391,22 @@ export function ConnectionForm({ connectionId, onClose }: Props) {
               onChange={(e) => {
                 const host = e.target.value;
                 const cloud = isCloudHost(host);
+                const detectedEngine = detectEngine(host);
+                const engine =
+                  form.engine === "sqlserver" && detectedEngine !== "sqlserver"
+                    ? form.engine
+                    : detectedEngine;
                 setForm({
                   ...form,
                   host,
-                  engine: detectEngine(host),
-                  ssl: cloud ? true : form.ssl,
-                  sslRejectUnauthorized: cloud ? false : form.sslRejectUnauthorized,
+                  engine,
+                  ssl: engine === "sqlserver" ? form.ssl : cloud ? true : form.ssl,
+                  sslRejectUnauthorized:
+                    engine === "sqlserver"
+                      ? form.sslRejectUnauthorized
+                      : cloud
+                        ? false
+                        : form.sslRejectUnauthorized,
                 });
               }}
             />
@@ -325,7 +417,7 @@ export function ConnectionForm({ connectionId, onClose }: Props) {
             </label>
             <input
               className={inputClass}
-              placeholder="5432"
+              placeholder={String(getDefaultPort(form.engine))}
               value={form.port}
               onChange={(e) => setForm({ ...form, port: e.target.value })}
             />
@@ -336,7 +428,7 @@ export function ConnectionForm({ connectionId, onClose }: Props) {
             </label>
             <input
               className={inputClass}
-              placeholder="postgres"
+              placeholder={form.engine === "sqlserver" ? "database" : "postgres"}
               value={form.database}
               onChange={(e) => setForm({ ...form, database: e.target.value })}
             />
@@ -347,7 +439,7 @@ export function ConnectionForm({ connectionId, onClose }: Props) {
             </label>
             <input
               className={inputClass}
-              placeholder="postgres"
+              placeholder={getDefaultUser(form.engine)}
               value={form.user}
               onChange={(e) => setForm({ ...form, user: e.target.value })}
             />
@@ -372,10 +464,10 @@ export function ConnectionForm({ connectionId, onClose }: Props) {
               className="rounded border-input"
             />
             <label htmlFor="ssl-form" className="text-[11px] text-muted-foreground">
-              Use SSL
+              {form.engine === "sqlserver" ? "Encrypt connection" : "Use SSL"}
             </label>
           </div>
-          {form.ssl && (
+          {form.ssl && isPostgresEngine(form.engine) && (
             <div className="col-span-2 flex items-center gap-1.5 ml-4">
               <input
                 type="checkbox"
@@ -388,6 +480,22 @@ export function ConnectionForm({ connectionId, onClose }: Props) {
               />
               <label htmlFor="ssl-reject-unauth" className="text-[11px] text-muted-foreground">
                 Allow self-signed certificates (insecure)
+              </label>
+            </div>
+          )}
+          {form.engine === "sqlserver" && (
+            <div className="col-span-2 flex items-center gap-1.5 ml-4">
+              <input
+                type="checkbox"
+                id="trust-server-cert"
+                checked={form.trustServerCertificate}
+                onChange={(e) =>
+                  setForm({ ...form, trustServerCertificate: e.target.checked })
+                }
+                className="rounded border-input"
+              />
+              <label htmlFor="trust-server-cert" className="text-[11px] text-muted-foreground">
+                Trust server certificate
               </label>
             </div>
           )}

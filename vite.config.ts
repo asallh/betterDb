@@ -22,7 +22,7 @@ export default defineConfig({
         vite: {
           build: {
             rollupOptions: {
-              external: ['pg'],
+              external: ['pg', 'mssql'],
             },
           },
         },

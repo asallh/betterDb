@@ -30,7 +30,9 @@ export function CellExpandModal({ value, column, dataType, onClose }: Props) {
   // Try to pretty-print JSON
   let displayValue = value;
   let isJson = false;
-  if (dataType === "json" || dataType === "jsonb") {
+  const normalizedType = dataType?.toLowerCase().replace(/\(.*/, "");
+  const looksLikeJson = value.trim().startsWith("{") || value.trim().startsWith("[");
+  if (normalizedType === "json" || normalizedType === "jsonb" || looksLikeJson) {
     try {
       displayValue = JSON.stringify(JSON.parse(value), null, 2);
       isJson = true;

@@ -1,7 +1,7 @@
 export interface ConnectionConfig {
   id: string;
   name: string;
-  engine: 'postgres' | 'supabase' | 'aws' | 'databricks';
+  engine: 'postgres' | 'supabase' | 'aws' | 'databricks' | 'sqlserver';
   host: string;
   port: number;
   database: string;
@@ -9,6 +9,8 @@ export interface ConnectionConfig {
   password: string;
   ssl?: boolean;
   sslRejectUnauthorized?: boolean;
+  trustServerCertificate?: boolean;
+  instanceName?: string;
   color?: string;
 }
 

@@ -7,23 +7,34 @@ import { Loader2, AlertCircle, Download, Maximize2 } from "lucide-react";
 
 const TYPE_COLORS: Record<string, string> = {
   int2: "text-blue-500", int4: "text-blue-500", int8: "text-blue-500",
+  smallint: "text-blue-500", int: "text-blue-500", bigint: "text-blue-500",
+  tinyint: "text-blue-500",
   float4: "text-blue-500", float8: "text-blue-500", numeric: "text-blue-500",
+  real: "text-blue-500", float: "text-blue-500", decimal: "text-blue-500",
   money: "text-blue-500", bool: "text-amber-500",
+  bit: "text-amber-500",
   text: "text-green-600 dark:text-green-400",
   varchar: "text-green-600 dark:text-green-400",
+  nvarchar: "text-green-600 dark:text-green-400",
   bpchar: "text-green-600 dark:text-green-400",
   char: "text-green-600 dark:text-green-400",
+  nchar: "text-green-600 dark:text-green-400",
   name: "text-green-600 dark:text-green-400",
   date: "text-purple-500", time: "text-purple-500", timetz: "text-purple-500",
   timestamp: "text-purple-500", timestamptz: "text-purple-500",
+  datetime: "text-purple-500", datetime2: "text-purple-500",
+  datetimeoffset: "text-purple-500", smalldatetime: "text-purple-500",
   interval: "text-purple-500", uuid: "text-orange-500",
+  uniqueidentifier: "text-orange-500",
   json: "text-pink-500", jsonb: "text-pink-500",
-  bytea: "text-red-500", inet: "text-cyan-500", cidr: "text-cyan-500",
+  bytea: "text-red-500", binary: "text-red-500", varbinary: "text-red-500",
+  image: "text-red-500", inet: "text-cyan-500", cidr: "text-cyan-500",
   macaddr: "text-cyan-500",
 };
 
 function getTypeColor(dataType: string): string {
-  return TYPE_COLORS[dataType] ?? "text-muted-foreground";
+  const normalized = dataType.toLowerCase().replace(/\(.*/, "");
+  return TYPE_COLORS[normalized] ?? "text-muted-foreground";
 }
 
 const DEFAULT_COL_WIDTH = 150;
