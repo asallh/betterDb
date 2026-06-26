@@ -6,12 +6,28 @@ export function isSqlServer(engine: SqlDialectEngine | undefined): boolean {
   return engine === "sqlserver";
 }
 
+export function isMySqlLike(engine: SqlDialectEngine | undefined): boolean {
+  return engine === "mysql" || engine === "mariadb";
+}
+
+export function isOracle(engine: SqlDialectEngine | undefined): boolean {
+  return engine === "oracle";
+}
+
+export function supportsDropSchemaCascade(engine: SqlDialectEngine | undefined): boolean {
+  return !isSqlServer(engine) && !isMySqlLike(engine) && engine !== "sqlite";
+}
+
 export function quoteIdentifier(
   identifier: string,
   engine: SqlDialectEngine | undefined
 ): string {
   if (isSqlServer(engine)) {
     return `[${identifier.replace(/]/g, "]]")}]`;
+  }
+
+  if (isMySqlLike(engine)) {
+    return `\`${identifier.replace(/`/g, "``")}\``;
   }
 
   return `"${identifier.replace(/"/g, '""')}"`;
@@ -29,7 +45,10 @@ export function parameterPlaceholder(
   index: number,
   engine: SqlDialectEngine | undefined
 ): string {
-  return isSqlServer(engine) ? `@p${index}` : `$${index}`;
+  if (isSqlServer(engine)) return `@p${index}`;
+  if (isMySqlLike(engine) || engine === "sqlite") return "?";
+  if (isOracle(engine)) return `:p${index}`;
+  return `$${index}`;
 }
 
 export function selectAllSql(
@@ -41,6 +60,10 @@ export function selectAllSql(
   const tableName = qualifiedName(schema, table, engine);
   if (isSqlServer(engine)) {
     return `SELECT TOP (${limit}) *\nFROM ${tableName};`;
+  }
+
+  if (isOracle(engine)) {
+    return `SELECT *\nFROM ${tableName}\nFETCH FIRST ${limit} ROWS ONLY;`;
   }
 
   return `SELECT *\nFROM ${tableName}\nLIMIT ${limit};`;
@@ -60,6 +83,10 @@ export function selectColumnsSql(
 
   if (isSqlServer(engine)) {
     return `SELECT TOP (${limit})\n${columnNames}\nFROM ${tableName};`;
+  }
+
+  if (isOracle(engine)) {
+    return `SELECT\n${columnNames}\nFROM ${tableName}\nFETCH FIRST ${limit} ROWS ONLY;`;
   }
 
   return `SELECT\n${columnNames}\nFROM ${tableName}\nLIMIT ${limit};`;

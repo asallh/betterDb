@@ -1,6 +1,10 @@
 import { DatabaseAdapter } from "./DatabaseAdapter";
+import { MariaDbAdapter } from "./MariaDbAdapter";
+import { MySqlAdapter } from "./MySqlAdapter";
+import { OracleAdapter } from "./OracleAdapter";
 import { PostgresAdapter } from "./PostgresAdapter";
 import { SqlServerAdapter } from "./SqlServerAdapter";
+import { SqliteAdapter } from "./SqliteAdapter";
 import type { ConnectionConfig } from "../../shared/types";
 
 export class ConnectionManager {
@@ -8,12 +12,25 @@ export class ConnectionManager {
   private activeConnectionId: string | null = null;
 
   createAdapter(config: ConnectionConfig): DatabaseAdapter {
-    if (config.engine === "sqlserver") {
-      return new SqlServerAdapter(config);
+    switch (config.engine) {
+      case "sqlserver":
+        return new SqlServerAdapter(config);
+      case "mysql":
+        return new MySqlAdapter(config);
+      case "mariadb":
+        return new MariaDbAdapter(config);
+      case "oracle":
+        return new OracleAdapter(config);
+      case "sqlite":
+        return new SqliteAdapter(config);
+      case "postgres":
+      case "supabase":
+      case "aws":
+      case "databricks":
+      default:
+        // Supabase, AWS RDS, and Databricks continue through the PostgreSQL-compatible path.
+        return new PostgresAdapter(config);
     }
-
-    // Supabase, AWS RDS, and Databricks continue through the PostgreSQL-compatible path.
-    return new PostgresAdapter(config);
   }
 
   async connect(config: ConnectionConfig): Promise<void> {

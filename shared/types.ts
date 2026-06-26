@@ -1,7 +1,18 @@
+export type DatabaseEngine =
+  | 'postgres'
+  | 'supabase'
+  | 'aws'
+  | 'databricks'
+  | 'sqlserver'
+  | 'oracle'
+  | 'mysql'
+  | 'sqlite'
+  | 'mariadb';
+
 export interface ConnectionConfig {
   id: string;
   name: string;
-  engine: 'postgres' | 'supabase' | 'aws' | 'databricks' | 'sqlserver';
+  engine: DatabaseEngine;
   host: string;
   port: number;
   database: string;

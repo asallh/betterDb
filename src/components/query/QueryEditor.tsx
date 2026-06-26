@@ -4,7 +4,7 @@ import { useConnectionStore } from "@/stores/connectionStore";
 import { EditorState } from "@codemirror/state";
 import { EditorView, keymap, placeholder } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
-import { sql, PostgreSQL, MSSQL } from "@codemirror/lang-sql";
+import { sql, PostgreSQL, MSSQL, MySQL, SQLite, StandardSQL } from "@codemirror/lang-sql";
 import { oneDark } from "@codemirror/theme-one-dark";
 import { basicSetup } from "codemirror";
 
@@ -23,6 +23,16 @@ export function QueryEditor({ tabId }: Props) {
   const activeEngine =
     connections.find((connection) => connection.id === activeConnectionId)?.engine ??
     "postgres";
+  const activeDialect =
+    activeEngine === "sqlserver"
+      ? MSSQL
+      : activeEngine === "mysql" || activeEngine === "mariadb"
+        ? MySQL
+        : activeEngine === "sqlite"
+          ? SQLite
+          : activeEngine === "oracle"
+            ? StandardSQL
+            : PostgreSQL;
 
   const handleExecute = useCallback(() => {
     executeQuery(tabId);
@@ -48,7 +58,7 @@ export function QueryEditor({ tabId }: Props) {
             },
           },
         ]),
-        sql({ dialect: activeEngine === "sqlserver" ? MSSQL : PostgreSQL }),
+        sql({ dialect: activeDialect }),
         oneDark,
         placeholder("Write your SQL query here... (Cmd+Enter to run)"),
         EditorView.updateListener.of((update) => {
