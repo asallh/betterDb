@@ -10,13 +10,10 @@
   },
   files: ["dist", "dist-electron"],
   mac: {
-    icon: "build/betterDB.icns",
     target: ["dmg"],
     artifactName: "${productName}-Mac-${version}-Installer.${ext}",
   },
   win: {
-    icon: "build/betterDB.ico",
-
     target: [
       {
         target: "nsis",
@@ -32,7 +29,6 @@
     deleteAppDataOnUninstall: false,
   },
   linux: {
-    icon: "build/betterDB.png",
     target: ["AppImage"],
     artifactName: "${productName}-Linux-${version}.${ext}",
   },

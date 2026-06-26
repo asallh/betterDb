@@ -22,7 +22,7 @@ export default defineConfig({
         vite: {
           build: {
             rollupOptions: {
-              external: ['pg'],
+              external: ['pg', 'mssql', 'mysql2', 'oracledb', 'better-sqlite3'],
             },
           },
         },

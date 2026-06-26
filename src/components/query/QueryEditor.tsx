@@ -1,9 +1,10 @@
 import { useRef, useEffect, useCallback } from "react";
 import { useQueryStore } from "@/stores/queryStore";
+import { useConnectionStore } from "@/stores/connectionStore";
 import { Compartment, EditorState, type Extension } from "@codemirror/state";
 import { EditorView, keymap, placeholder } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
-import { sql, PostgreSQL } from "@codemirror/lang-sql";
+import { sql, PostgreSQL, MSSQL, MySQL, SQLite, StandardSQL } from "@codemirror/lang-sql";
 import { oneDark } from "@codemirror/theme-one-dark";
 import { basicSetup } from "codemirror";
 import { useIsDark } from "@/hooks/useIsDark";
@@ -26,6 +27,21 @@ export function QueryEditor({ tabId }: Props) {
   const executeQuery = useQueryStore((s) => s.executeQuery);
   const tab = useQueryStore((s) => s.tabs.find((t) => t.id === tabId));
   const isDark = useIsDark();
+  const connections = useConnectionStore((s) => s.connections);
+  const activeConnectionId = useConnectionStore((s) => s.activeConnectionId);
+  const activeEngine =
+    connections.find((connection) => connection.id === activeConnectionId)?.engine ??
+    "postgres";
+  const activeDialect =
+    activeEngine === "sqlserver"
+      ? MSSQL
+      : activeEngine === "mysql" || activeEngine === "mariadb"
+        ? MySQL
+        : activeEngine === "sqlite"
+          ? SQLite
+          : activeEngine === "oracle"
+            ? StandardSQL
+            : PostgreSQL;
 
   const handleExecute = useCallback(() => {
     executeQuery(tabId);
@@ -51,7 +67,7 @@ export function QueryEditor({ tabId }: Props) {
             },
           },
         ]),
-        sql({ dialect: PostgreSQL }),
+        sql({ dialect: activeDialect }),
         themeCompartment.current.of(themeExtension(isDark)),
         placeholder("Write your SQL query here... (Cmd+Enter to run)"),
         EditorView.updateListener.of((update) => {
@@ -77,9 +93,9 @@ export function QueryEditor({ tabId }: Props) {
     return () => {
       view.destroy();
     };
-    // Only recreate editor when tabId changes, not on every render
+    // Only recreate editor when tabId or SQL dialect changes, not on every render
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tabId]);
+  }, [tabId, activeEngine]);
 
   // Swap the editor theme in place when the system color scheme changes.
   useEffect(() => {

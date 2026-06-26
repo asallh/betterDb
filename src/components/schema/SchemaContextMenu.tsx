@@ -3,6 +3,15 @@ import { db } from "@/lib/ipc";
 import { useSchemaStore } from "@/stores/schemaStore";
 import { useTableViewStore } from "@/stores/tableViewStore";
 import { useQueryStore } from "@/stores/queryStore";
+import { useConnectionStore } from "@/stores/connectionStore";
+import {
+  parameterPlaceholder,
+  qualifiedName,
+  quoteIdentifier,
+  selectAllSql,
+  selectColumnsSql,
+  supportsDropSchemaCascade,
+} from "@/lib/sqlDialect";
 import type { ColumnInfo } from "../../../shared/types";
 
 export type ContextTarget =
@@ -31,6 +40,11 @@ export function SchemaContextMenu({ target, position, onClose }: Props) {
   const loadTables = useSchemaStore((s) => s.loadTables);
   const openTable = useTableViewStore((s) => s.openTable);
   const { addTab, updateSQL } = useQueryStore();
+  const connections = useConnectionStore((s) => s.connections);
+  const activeConnectionId = useConnectionStore((s) => s.activeConnectionId);
+  const activeEngine =
+    connections.find((connection) => connection.id === activeConnectionId)?.engine ??
+    "postgres";
 
   const close = useCallback(() => {
     setConfirmAction(null);
@@ -101,13 +115,13 @@ export function SchemaContextMenu({ target, position, onClose }: Props) {
             label: "Generate SELECT All Tables",
             action: () => {
               const tables = useSchemaStore.getState().tables.filter(t => t.schema === target.schema);
-              const sql = tables.map(t => `SELECT * FROM "${target.schema}"."${t.name}" LIMIT 100;`).join("\n");
+              const sql = tables.map(t => selectAllSql(target.schema, t.name, activeEngine)).join("\n");
               openInEditor(sql);
             },
           },
           {
             label: "Generate CREATE SCHEMA",
-            action: () => openInEditor(`CREATE SCHEMA "${target.schema}";`),
+            action: () => openInEditor(`CREATE SCHEMA ${quoteIdentifier(target.schema, activeEngine)};`),
           },
           { label: "", separator: true, action: () => {} },
           {
@@ -118,14 +132,16 @@ export function SchemaContextMenu({ target, position, onClose }: Props) {
               if (result.error) { setInfoDialog({ title: "Error", body: result.error }); } else { await refreshAll(); close(); }
             }),
           },
-          {
-            label: "Drop Schema (CASCADE)",
-            danger: true,
-            action: withConfirm(`Drop schema "${target.schema}" CASCADE? This will delete ALL tables, views, and data in this schema.`, async () => {
-              const result = await db.dropSchema(target.schema, true);
-              if (result.error) { setInfoDialog({ title: "Error", body: result.error }); } else { await refreshAll(); close(); }
-            }),
-          },
+          ...(supportsDropSchemaCascade(activeEngine)
+            ? [{
+                label: "Drop Schema (CASCADE)",
+                danger: true,
+                action: withConfirm(`Drop schema "${target.schema}" CASCADE? This will delete ALL tables, views, and data in this schema.`, async () => {
+                  const result = await db.dropSchema(target.schema, true);
+                  if (result.error) { setInfoDialog({ title: "Error", body: result.error }); } else { await refreshAll(); close(); }
+                }),
+              }]
+            : []),
         ];
 
       case "table": {
@@ -165,27 +181,26 @@ export function SchemaContextMenu({ target, position, onClose }: Props) {
           { label: "", separator: true, action: () => {} },
           {
             label: "Copy Table Name",
-            action: () => copyToClipboard(`"${target.schema}"."${target.table}"`),
+            action: () => copyToClipboard(qualifiedName(target.schema, target.table, activeEngine)),
           },
           {
             label: "Generate SELECT",
-            action: () => openInEditor(`SELECT *\nFROM "${target.schema}"."${target.table}"\nLIMIT 100;`),
+            action: () => openInEditor(selectAllSql(target.schema, target.table, activeEngine)),
           },
           {
             label: "Generate SELECT (columns)",
             action: async () => {
               const cols = await db.getColumns(target.schema, target.table);
-              const colNames = cols.map(c => `  "${c.name}"`).join(",\n");
-              openInEditor(`SELECT\n${colNames}\nFROM "${target.schema}"."${target.table}"\nLIMIT 100;`);
+              openInEditor(selectColumnsSql(target.schema, target.table, cols.map(c => c.name), activeEngine));
             },
           },
           {
             label: "Generate INSERT Template",
             action: async () => {
               const cols = await db.getColumns(target.schema, target.table);
-              const colNames = cols.map(c => `"${c.name}"`).join(", ");
-              const placeholders = cols.map((_, i) => `$${i + 1}`).join(", ");
-              openInEditor(`INSERT INTO "${target.schema}"."${target.table}" (${colNames})\nVALUES (${placeholders});`);
+              const colNames = cols.map(c => quoteIdentifier(c.name, activeEngine)).join(", ");
+              const placeholders = cols.map((_, i) => parameterPlaceholder(i + 1, activeEngine)).join(", ");
+              openInEditor(`INSERT INTO ${qualifiedName(target.schema, target.table, activeEngine)} (${colNames})\nVALUES (${placeholders});`);
             },
           },
           {
@@ -194,11 +209,12 @@ export function SchemaContextMenu({ target, position, onClose }: Props) {
               const cols = await db.getColumns(target.schema, target.table);
               const pkCols = cols.filter(c => c.isPrimaryKey);
               const nonPkCols = cols.filter(c => !c.isPrimaryKey);
-              const setClauses = nonPkCols.map(c => `  "${c.name}" = ?`).join(",\n");
+              let paramIndex = 1;
+              const setClauses = nonPkCols.map(c => `  ${quoteIdentifier(c.name, activeEngine)} = ${parameterPlaceholder(paramIndex++, activeEngine)}`).join(",\n");
               const whereClauses = pkCols.length > 0
-                ? pkCols.map(c => `"${c.name}" = ?`).join(" AND ")
+                ? pkCols.map(c => `${quoteIdentifier(c.name, activeEngine)} = ${parameterPlaceholder(paramIndex++, activeEngine)}`).join(" AND ")
                 : "/* add WHERE condition */";
-              openInEditor(`UPDATE "${target.schema}"."${target.table}"\nSET\n${setClauses}\nWHERE ${whereClauses};`);
+              openInEditor(`UPDATE ${qualifiedName(target.schema, target.table, activeEngine)}\nSET\n${setClauses}\nWHERE ${whereClauses};`);
             },
           },
           {
@@ -207,9 +223,9 @@ export function SchemaContextMenu({ target, position, onClose }: Props) {
               const cols = await db.getColumns(target.schema, target.table);
               const pkCols = cols.filter(c => c.isPrimaryKey);
               const whereClauses = pkCols.length > 0
-                ? pkCols.map(c => `"${c.name}" = ?`).join(" AND ")
+                ? pkCols.map((c, i) => `${quoteIdentifier(c.name, activeEngine)} = ${parameterPlaceholder(i + 1, activeEngine)}`).join(" AND ")
                 : "/* add WHERE condition */";
-              openInEditor(`DELETE FROM "${target.schema}"."${target.table}"\nWHERE ${whereClauses};`);
+              openInEditor(`DELETE FROM ${qualifiedName(target.schema, target.table, activeEngine)}\nWHERE ${whereClauses};`);
             },
           },
           {
@@ -217,16 +233,16 @@ export function SchemaContextMenu({ target, position, onClose }: Props) {
             action: async () => {
               const cols = await db.getColumns(target.schema, target.table);
               const colDefs = cols.map(c => {
-                let def = `  "${c.name}" ${c.dataType}`;
+                let def = `  ${quoteIdentifier(c.name, activeEngine)} ${c.dataType}`;
                 if (!c.nullable) def += " NOT NULL";
                 if (c.defaultValue) def += ` DEFAULT ${c.defaultValue}`;
                 return def;
               });
               const pkCols = cols.filter(c => c.isPrimaryKey);
               if (pkCols.length > 0) {
-                colDefs.push(`  PRIMARY KEY (${pkCols.map(c => `"${c.name}"`).join(", ")})`);
+                colDefs.push(`  PRIMARY KEY (${pkCols.map(c => quoteIdentifier(c.name, activeEngine)).join(", ")})`);
               }
-              openInEditor(`CREATE TABLE "${target.schema}"."${target.table}" (\n${colDefs.join(",\n")}\n);`);
+              openInEditor(`CREATE TABLE ${qualifiedName(target.schema, target.table, activeEngine)} (\n${colDefs.join(",\n")}\n);`);
             },
           },
         ];
@@ -300,20 +316,20 @@ export function SchemaContextMenu({ target, position, onClose }: Props) {
           },
           {
             label: "Copy Qualified Name",
-            action: () => copyToClipboard(`"${target.schema}"."${target.table}"."${target.column.name}"`),
+            action: () => copyToClipboard(`${qualifiedName(target.schema, target.table, activeEngine)}.${quoteIdentifier(target.column.name, activeEngine)}`),
           },
           { label: "", separator: true, action: () => {} },
           {
             label: "Generate SELECT with WHERE",
-            action: () => openInEditor(`SELECT *\nFROM "${target.schema}"."${target.table}"\nWHERE "${target.column.name}" = ?;`),
+            action: () => openInEditor(`SELECT *\nFROM ${qualifiedName(target.schema, target.table, activeEngine)}\nWHERE ${quoteIdentifier(target.column.name, activeEngine)} = ${parameterPlaceholder(1, activeEngine)};`),
           },
           {
             label: "Generate SELECT DISTINCT",
-            action: () => openInEditor(`SELECT DISTINCT "${target.column.name}"\nFROM "${target.schema}"."${target.table}"\nORDER BY "${target.column.name}";`),
+            action: () => openInEditor(`SELECT DISTINCT ${quoteIdentifier(target.column.name, activeEngine)}\nFROM ${qualifiedName(target.schema, target.table, activeEngine)}\nORDER BY ${quoteIdentifier(target.column.name, activeEngine)};`),
           },
           {
             label: "Generate GROUP BY",
-            action: () => openInEditor(`SELECT "${target.column.name}", COUNT(*)\nFROM "${target.schema}"."${target.table}"\nGROUP BY "${target.column.name}"\nORDER BY COUNT(*) DESC;`),
+            action: () => openInEditor(`SELECT ${quoteIdentifier(target.column.name, activeEngine)}, COUNT(*)\nFROM ${qualifiedName(target.schema, target.table, activeEngine)}\nGROUP BY ${quoteIdentifier(target.column.name, activeEngine)}\nORDER BY COUNT(*) DESC;`),
           },
           { label: "", separator: true, action: () => {} },
           {
