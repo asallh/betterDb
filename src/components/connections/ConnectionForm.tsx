@@ -1,6 +1,18 @@
 import { useState, useEffect } from "react";
 import { useConnectionStore } from "@/stores/connectionStore";
 import { db } from "@/lib/ipc";
+import {
+  DATABASE_ENGINE_ORDER,
+  DATABASE_ENGINES,
+  engineFromScheme,
+  getDefaultDatabase,
+  getDefaultPort,
+  getDefaultUser,
+  requiresHost,
+  supportsSsl,
+  supportsSslRejectUnauthorized,
+  supportsTrustServerCertificate,
+} from "@/lib/databaseEngines";
 import type { ConnectionConfig } from "../../../shared/types";
 import { CheckCircle, XCircle, Loader2, Link } from "lucide-react";
 
@@ -20,7 +32,7 @@ function defaultFormState(): {
     name: "",
     host: "localhost",
     port: "5432",
-    database: "",
+    database: getDefaultDatabase("postgres"),
     user: "postgres",
     password: "",
     ssl: false,
@@ -37,29 +49,30 @@ interface Props {
 
 type FormMode = "fields" | "uri";
 
-function isPostgresEngine(engine: ConnectionConfig["engine"]): boolean {
-  return engine !== "sqlserver";
-}
-
-function getDefaultPort(engine: ConnectionConfig["engine"]): number {
-  return engine === "sqlserver" ? 1433 : 5432;
-}
-
-function getDefaultUser(engine: ConnectionConfig["engine"]): string {
-  return engine === "sqlserver" ? "sa" : "postgres";
-}
-
 function parseConnectionString(uri: string): Partial<ConnectionConfig> | null {
   try {
     const scheme = uri.match(/^([a-z]+):\/\//i)?.[1]?.toLowerCase();
-    const engine =
-      scheme === "sqlserver" || scheme === "mssql"
-        ? "sqlserver"
-        : scheme === "postgres" || scheme === "postgresql"
-          ? "postgres"
-          : null;
+    if (!scheme) return null;
+
+    const engine = engineFromScheme(scheme);
 
     if (!engine) return null;
+
+    if (engine === "sqlite") {
+      const database =
+        scheme === "file"
+          ? decodeURIComponent(new URL(uri).pathname)
+          : decodeURIComponent(uri.replace(/^sqlite:\/\//i, ""));
+      return {
+        engine,
+        host: "",
+        port: 0,
+        database,
+        user: "",
+        password: "",
+        ssl: false,
+      };
+    }
 
     // Use http:// for parsing since database URL schemes are not all "special"
     // URL schemes and can otherwise parse credentials/host inconsistently.
@@ -71,7 +84,7 @@ function parseConnectionString(uri: string): Partial<ConnectionConfig> | null {
       engine,
       host: url.hostname || "localhost",
       port: parseInt(url.port, 10) || defaultPort,
-      database: url.pathname.replace(/^\//, "") || (engine === "sqlserver" ? "" : "postgres"),
+      database: url.pathname.replace(/^\//, "") || getDefaultDatabase(engine),
       user: url.username || defaultUser,
       password: decodeURIComponent(url.password || ""),
       ssl: url.searchParams.get("sslmode") === "require" ||
@@ -88,12 +101,15 @@ function parseConnectionString(uri: string): Partial<ConnectionConfig> | null {
 
 function isCloudHost(host: string): boolean {
   const h = host.toLowerCase();
-  return h.includes("supabase") || h.includes("rds.amazonaws.com") || h.includes("redshift.amazonaws.com") || h.includes("neon.tech") || h.includes("aivencloud.com") || h.includes("databricks");
+  return h.includes("supabase") || h.includes("rds.amazonaws.com") || h.includes("redshift.amazonaws.com") || h.includes("neon.tech") || h.includes("aivencloud.com") || h.includes("databricks") || h.includes("planetscale") || h.includes("oraclecloud");
 }
 
 function detectEngine(host: string): ConnectionConfig["engine"] {
   const h = host.toLowerCase();
   if (h.includes("database.windows.net")) return "sqlserver";
+  if (h.includes("oraclecloud")) return "oracle";
+  if (h.includes("mariadb")) return "mariadb";
+  if (h.includes("mysql") || h.includes("planetscale")) return "mysql";
   if (h.includes("supabase")) return "supabase";
   if (h.includes("rds.amazonaws.com") || h.includes("redshift.amazonaws.com") || h.includes("aws")) return "aws";
   if (h.includes("databricks")) return "databricks";
@@ -110,13 +126,21 @@ function buildConnectionString(form: {
   trustServerCertificate?: boolean;
   engine: ConnectionConfig["engine"];
 }): string {
+  if (form.engine === "sqlite") {
+    return form.database ? `sqlite://${form.database}` : "";
+  }
   const pass = form.password ? `:${encodeURIComponent(form.password)}` : "";
-  const scheme = form.engine === "sqlserver" ? "sqlserver" : "postgresql";
+  const scheme =
+    form.engine === "sqlserver"
+      ? "sqlserver"
+      : form.engine === "mysql" || form.engine === "mariadb" || form.engine === "oracle"
+        ? form.engine
+        : "postgresql";
   const params = new URLSearchParams();
   if (form.engine === "sqlserver") {
     if (form.ssl) params.set("encrypt", "true");
     if (form.trustServerCertificate) params.set("trustServerCertificate", "true");
-  } else if (form.ssl) {
+  } else if (supportsSsl(form.engine) && form.ssl) {
     params.set("sslmode", "require");
   }
   const query = params.size > 0 ? `?${params.toString()}` : "";
@@ -206,9 +230,15 @@ export function ConnectionForm({ connectionId, onClose }: Props) {
         database: parsed.database ?? f.database,
         user: parsed.user ?? f.user,
         password: parsed.password ?? f.password,
-        ssl: nextEngine === "sqlserver" ? (parsed.ssl ?? f.ssl) : cloud ? true : (parsed.ssl ?? f.ssl),
+        ssl: supportsSsl(nextEngine)
+          ? nextEngine === "sqlserver"
+            ? (parsed.ssl ?? f.ssl)
+            : cloud ? true : (parsed.ssl ?? f.ssl)
+          : false,
         sslRejectUnauthorized:
-          nextEngine === "sqlserver" ? f.sslRejectUnauthorized : cloud ? false : f.sslRejectUnauthorized,
+          supportsSslRejectUnauthorized(nextEngine) && cloud
+            ? false
+            : f.sslRejectUnauthorized,
         trustServerCertificate:
           parsed.trustServerCertificate ?? f.trustServerCertificate,
         engine: nextEngine,
@@ -234,11 +264,11 @@ export function ConnectionForm({ connectionId, onClose }: Props) {
       database: form.database,
       user: form.user,
       password: form.password,
-      ssl: form.ssl,
-      ...(isPostgresEngine(form.engine) && form.ssl && {
+      ssl: supportsSsl(form.engine) ? form.ssl : false,
+      ...(supportsSslRejectUnauthorized(form.engine) && form.ssl && {
         sslRejectUnauthorized: form.sslRejectUnauthorized,
       }),
-      ...(form.engine === "sqlserver" && {
+      ...(supportsTrustServerCertificate(form.engine) && {
         trustServerCertificate: form.trustServerCertificate,
       }),
     };
@@ -271,6 +301,8 @@ export function ConnectionForm({ connectionId, onClose }: Props) {
   const inputClass =
     "w-full rounded border border-input bg-background px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-ring";
   const uriValid = !connectionString || parseConnectionString(connectionString) !== null;
+  const hasRequiredFields =
+    (requiresHost(form.engine) ? Boolean(form.host) : true) && Boolean(form.database);
 
   return (
     <div className="space-y-2">
@@ -311,7 +343,7 @@ export function ConnectionForm({ connectionId, onClose }: Props) {
             <textarea
               className={`${inputClass} resize-none font-mono`}
               rows={2}
-              placeholder="postgresql://user:password@host:5432/dbname?sslmode=require or sqlserver://user:password@host:1433/dbname?encrypt=true"
+              placeholder="postgresql://user:pass@host:5432/db, mysql://user:pass@host:3306/db, oracle://user:pass@host:1521/service, or sqlite:///path/db.sqlite"
               value={connectionString}
               onChange={(e) => applyUri(e.target.value)}
               spellCheck={false}
@@ -351,22 +383,28 @@ export function ConnectionForm({ connectionId, onClose }: Props) {
                 setForm({
                   ...form,
                   engine,
+                  host: requiresHost(engine) ? form.host || "localhost" : "",
                   port:
                     form.port === previousDefaultPort
                       ? String(getDefaultPort(engine))
                       : form.port,
+                  database:
+                    form.database === getDefaultDatabase(form.engine)
+                      ? getDefaultDatabase(engine)
+                      : form.database,
                   user:
                     form.user === previousDefaultUser
                       ? getDefaultUser(engine)
                       : form.user,
+                  ssl: supportsSsl(engine) ? form.ssl : false,
                 });
               }}
             >
-              <option value="postgres">PostgreSQL</option>
-              <option value="supabase">Supabase</option>
-              <option value="aws">AWS/RDS PostgreSQL</option>
-              <option value="databricks">Databricks</option>
-              <option value="sqlserver">SQL Server</option>
+              {DATABASE_ENGINE_ORDER.map((engine) => (
+                <option key={engine} value={engine}>
+                  {DATABASE_ENGINES[engine].label}
+                </option>
+              ))}
             </select>
           </div>
           <div className="col-span-2">
@@ -380,94 +418,108 @@ export function ConnectionForm({ connectionId, onClose }: Props) {
               onChange={(e) => setForm({ ...form, name: e.target.value })}
             />
           </div>
-          <div>
-            <label className="mb-0.5 block text-[11px] text-muted-foreground">
-              Host
-            </label>
-            <input
-              className={inputClass}
-              placeholder="localhost"
-              value={form.host}
-              onChange={(e) => {
-                const host = e.target.value;
-                const cloud = isCloudHost(host);
-                const detectedEngine = detectEngine(host);
-                const engine =
-                  form.engine === "sqlserver" && detectedEngine !== "sqlserver"
-                    ? form.engine
-                    : detectedEngine;
-                setForm({
-                  ...form,
-                  host,
-                  engine,
-                  ssl: engine === "sqlserver" ? form.ssl : cloud ? true : form.ssl,
-                  sslRejectUnauthorized:
-                    engine === "sqlserver"
-                      ? form.sslRejectUnauthorized
-                      : cloud
-                        ? false
-                        : form.sslRejectUnauthorized,
-                });
-              }}
-            />
-          </div>
-          <div>
-            <label className="mb-0.5 block text-[11px] text-muted-foreground">
-              Port
-            </label>
-            <input
-              className={inputClass}
-              placeholder={String(getDefaultPort(form.engine))}
-              value={form.port}
-              onChange={(e) => setForm({ ...form, port: e.target.value })}
-            />
-          </div>
+          {requiresHost(form.engine) && (
+            <>
+              <div>
+                <label className="mb-0.5 block text-[11px] text-muted-foreground">
+                  Host
+                </label>
+                <input
+                  className={inputClass}
+                  placeholder="localhost"
+                  value={form.host}
+                  onChange={(e) => {
+                    const host = e.target.value;
+                    const cloud = isCloudHost(host);
+                    const detectedEngine = detectEngine(host);
+                    const shouldAutoDetect = ["postgres", "supabase", "aws", "databricks"].includes(form.engine);
+                    const engine = shouldAutoDetect ? detectedEngine : form.engine;
+                    setForm({
+                      ...form,
+                      host,
+                      engine,
+                      ssl: supportsSsl(engine)
+                        ? engine === "sqlserver"
+                          ? form.ssl
+                          : cloud ? true : form.ssl
+                        : false,
+                      sslRejectUnauthorized:
+                        supportsSslRejectUnauthorized(engine) && cloud
+                          ? false
+                          : form.sslRejectUnauthorized,
+                    });
+                  }}
+                />
+              </div>
+              <div>
+                <label className="mb-0.5 block text-[11px] text-muted-foreground">
+                  Port
+                </label>
+                <input
+                  className={inputClass}
+                  placeholder={String(getDefaultPort(form.engine))}
+                  value={form.port}
+                  onChange={(e) => setForm({ ...form, port: e.target.value })}
+                />
+              </div>
+            </>
+          )}
           <div className="col-span-2">
             <label className="mb-0.5 block text-[11px] text-muted-foreground">
-              Database
+              {form.engine === "sqlite" ? "Database File Path" : "Database"}
             </label>
             <input
               className={inputClass}
-              placeholder={form.engine === "sqlserver" ? "database" : "postgres"}
+              placeholder={
+                form.engine === "sqlite"
+                  ? "/path/to/database.sqlite"
+                  : getDefaultDatabase(form.engine) || "database"
+              }
               value={form.database}
               onChange={(e) => setForm({ ...form, database: e.target.value })}
             />
           </div>
-          <div>
-            <label className="mb-0.5 block text-[11px] text-muted-foreground">
-              User
-            </label>
-            <input
-              className={inputClass}
-              placeholder={getDefaultUser(form.engine)}
-              value={form.user}
-              onChange={(e) => setForm({ ...form, user: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="mb-0.5 block text-[11px] text-muted-foreground">
-              Password
-            </label>
-            <input
-              className={inputClass}
-              type="password"
-              value={form.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
-            />
-          </div>
-          <div className="col-span-2 flex items-center gap-1.5">
-            <input
-              type="checkbox"
-              id="ssl-form"
-              checked={form.ssl}
-              onChange={(e) => setForm({ ...form, ssl: e.target.checked })}
-              className="rounded border-input"
-            />
-            <label htmlFor="ssl-form" className="text-[11px] text-muted-foreground">
-              {form.engine === "sqlserver" ? "Encrypt connection" : "Use SSL"}
-            </label>
-          </div>
-          {form.ssl && isPostgresEngine(form.engine) && (
+          {form.engine !== "sqlite" && (
+            <>
+              <div>
+                <label className="mb-0.5 block text-[11px] text-muted-foreground">
+                  User
+                </label>
+                <input
+                  className={inputClass}
+                  placeholder={getDefaultUser(form.engine)}
+                  value={form.user}
+                  onChange={(e) => setForm({ ...form, user: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="mb-0.5 block text-[11px] text-muted-foreground">
+                  Password
+                </label>
+                <input
+                  className={inputClass}
+                  type="password"
+                  value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                />
+              </div>
+            </>
+          )}
+          {supportsSsl(form.engine) && (
+            <div className="col-span-2 flex items-center gap-1.5">
+              <input
+                type="checkbox"
+                id="ssl-form"
+                checked={form.ssl}
+                onChange={(e) => setForm({ ...form, ssl: e.target.checked })}
+                className="rounded border-input"
+              />
+              <label htmlFor="ssl-form" className="text-[11px] text-muted-foreground">
+                {form.engine === "sqlserver" ? "Encrypt connection" : "Use SSL"}
+              </label>
+            </div>
+          )}
+          {form.ssl && supportsSslRejectUnauthorized(form.engine) && (
             <div className="col-span-2 flex items-center gap-1.5 ml-4">
               <input
                 type="checkbox"
@@ -483,7 +535,7 @@ export function ConnectionForm({ connectionId, onClose }: Props) {
               </label>
             </div>
           )}
-          {form.engine === "sqlserver" && (
+          {supportsTrustServerCertificate(form.engine) && (
             <div className="col-span-2 flex items-center gap-1.5 ml-4">
               <input
                 type="checkbox"
@@ -529,7 +581,7 @@ export function ConnectionForm({ connectionId, onClose }: Props) {
       <div className="flex gap-1.5">
         <button
           onClick={handleTest}
-          disabled={isTesting || !form.host || !form.database || (mode === "uri" && !uriValid)}
+          disabled={isTesting || !hasRequiredFields || (mode === "uri" && !uriValid)}
           className="rounded border border-border px-2 py-1 text-[11px] hover:bg-accent disabled:opacity-40 transition-colors"
         >
           {isTesting ? (
@@ -540,14 +592,14 @@ export function ConnectionForm({ connectionId, onClose }: Props) {
         </button>
         <button
           onClick={handleSave}
-          disabled={isSaving || !form.host || !form.database}
+          disabled={isSaving || !hasRequiredFields}
           className="rounded border border-border px-2 py-1 text-[11px] hover:bg-accent disabled:opacity-40 transition-colors"
         >
           Save
         </button>
         <button
           onClick={handleSaveAndConnect}
-          disabled={isSaving || !form.host || !form.database || (mode === "uri" && !uriValid)}
+          disabled={isSaving || !hasRequiredFields || (mode === "uri" && !uriValid)}
           className="flex-1 rounded bg-primary px-2 py-1 text-[11px] text-primary-foreground hover:bg-primary/90 disabled:opacity-40 transition-colors"
         >
           {isSaving ? "Connecting..." : "Save & Connect"}

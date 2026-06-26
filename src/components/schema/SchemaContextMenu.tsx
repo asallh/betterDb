@@ -5,12 +5,12 @@ import { useTableViewStore } from "@/stores/tableViewStore";
 import { useQueryStore } from "@/stores/queryStore";
 import { useConnectionStore } from "@/stores/connectionStore";
 import {
-  isSqlServer,
   parameterPlaceholder,
   qualifiedName,
   quoteIdentifier,
   selectAllSql,
   selectColumnsSql,
+  supportsDropSchemaCascade,
 } from "@/lib/sqlDialect";
 import type { ColumnInfo } from "../../../shared/types";
 
@@ -131,9 +131,8 @@ export function SchemaContextMenu({ target, position, onClose }: Props) {
               close();
             }),
           },
-          ...(isSqlServer(activeEngine)
-            ? []
-            : [{
+          ...(supportsDropSchemaCascade(activeEngine)
+            ? [{
                 label: "Drop Schema (CASCADE)",
                 danger: true,
                 action: withConfirm(`Drop schema "${target.schema}" CASCADE? This will delete ALL tables, views, and data in this schema.`, async () => {
@@ -141,7 +140,8 @@ export function SchemaContextMenu({ target, position, onClose }: Props) {
                   if (result.error) { alert(result.error); } else { await refreshAll(); }
                   close();
                 }),
-              }]),
+              }]
+            : []),
         ];
 
       case "table": {
