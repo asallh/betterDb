@@ -4,6 +4,7 @@ import { useSchemaStore } from "@/stores/schemaStore";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { MainArea } from "@/components/layout/MainArea";
 import { StatusBar } from "@/components/layout/StatusBar";
+import { TitleBar } from "@/components/layout/TitleBar";
 import { WelcomeScreen } from "@/components/layout/WelcomeScreen";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 
@@ -36,6 +37,7 @@ export default function App() {
 
   return (
     <div className="flex h-screen flex-col bg-background">
+      <TitleBar />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar />
         {activeConnectionId ? <MainArea /> : <WelcomeScreen />}

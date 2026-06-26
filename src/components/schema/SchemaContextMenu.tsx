@@ -26,6 +26,7 @@ interface MenuItem {
 export function SchemaContextMenu({ target, position, onClose }: Props) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [confirmAction, setConfirmAction] = useState<{ label: string; action: () => Promise<void> } | null>(null);
+  const [infoDialog, setInfoDialog] = useState<{ title: string; body: string } | null>(null);
   const refreshAll = useSchemaStore((s) => s.refreshAll);
   const loadTables = useSchemaStore((s) => s.loadTables);
   const openTable = useTableViewStore((s) => s.openTable);
@@ -33,6 +34,7 @@ export function SchemaContextMenu({ target, position, onClose }: Props) {
 
   const close = useCallback(() => {
     setConfirmAction(null);
+    setInfoDialog(null);
     onClose();
   }, [onClose]);
 
@@ -63,7 +65,7 @@ export function SchemaContextMenu({ target, position, onClose }: Props) {
     if (rect.bottom > window.innerHeight) {
       menuRef.current.style.top = `${window.innerHeight - rect.height - 8}px`;
     }
-  }, [confirmAction]);
+  }, [confirmAction, infoDialog]);
 
   function copyToClipboard(text: string) {
     navigator.clipboard.writeText(text);
@@ -113,8 +115,7 @@ export function SchemaContextMenu({ target, position, onClose }: Props) {
             danger: true,
             action: withConfirm(`Drop schema "${target.schema}"? This will fail if the schema is not empty.`, async () => {
               const result = await db.dropSchema(target.schema, false);
-              if (result.error) { alert(result.error); } else { await refreshAll(); }
-              close();
+              if (result.error) { setInfoDialog({ title: "Error", body: result.error }); } else { await refreshAll(); close(); }
             }),
           },
           {
@@ -122,8 +123,7 @@ export function SchemaContextMenu({ target, position, onClose }: Props) {
             danger: true,
             action: withConfirm(`Drop schema "${target.schema}" CASCADE? This will delete ALL tables, views, and data in this schema.`, async () => {
               const result = await db.dropSchema(target.schema, true);
-              if (result.error) { alert(result.error); } else { await refreshAll(); }
-              close();
+              if (result.error) { setInfoDialog({ title: "Error", body: result.error }); } else { await refreshAll(); close(); }
             }),
           },
         ];
@@ -139,8 +139,10 @@ export function SchemaContextMenu({ target, position, onClose }: Props) {
             label: "Count Rows",
             action: async () => {
               const count = await db.getTableRowCount(target.schema, target.table);
-              alert(`${target.schema}.${target.table}: ${count.toLocaleString()} rows`);
-              close();
+              setInfoDialog({
+                title: `${target.schema}.${target.table}`,
+                body: `${count.toLocaleString()} rows`,
+              });
             },
           },
           {
@@ -148,11 +150,16 @@ export function SchemaContextMenu({ target, position, onClose }: Props) {
             action: async () => {
               try {
                 const size = await db.getTableSize(target.schema, target.table);
-                alert(`${target.schema}.${target.table}\n\nTotal: ${size.totalSize}\nData: ${size.dataSize}\nIndexes: ${size.indexSize}`);
+                setInfoDialog({
+                  title: `${target.schema}.${target.table}`,
+                  body: `Total: ${size.totalSize}\nData: ${size.dataSize}\nIndexes: ${size.indexSize}`,
+                });
               } catch {
-                alert("Could not get table size (may not be supported for views).");
+                setInfoDialog({
+                  title: "Table Size",
+                  body: "Could not get table size (may not be supported for views).",
+                });
               }
-              close();
             },
           },
           { label: "", separator: true, action: () => {} },
@@ -232,14 +239,19 @@ export function SchemaContextMenu({ target, position, onClose }: Props) {
               action: async () => {
                 const indexes = await db.getIndexes(target.schema, target.table);
                 if (indexes.length === 0) {
-                  alert("No indexes found.");
+                  setInfoDialog({
+                    title: `Indexes on ${target.schema}.${target.table}`,
+                    body: "No indexes found.",
+                  });
                 } else {
                   const lines = indexes.map(idx =>
                     `${idx.isPrimary ? "[PK] " : idx.isUnique ? "[UQ] " : ""}${idx.name}\n  ${idx.columns}`
                   );
-                  alert(`Indexes on ${target.schema}.${target.table}:\n\n${lines.join("\n\n")}`);
+                  setInfoDialog({
+                    title: `Indexes on ${target.schema}.${target.table}`,
+                    body: lines.join("\n\n"),
+                  });
                 }
-                close();
               },
             },
           );
@@ -253,8 +265,7 @@ export function SchemaContextMenu({ target, position, onClose }: Props) {
                 danger: true,
                 action: withConfirm(`Drop view "${target.schema}"."${target.table}"?`, async () => {
                   const result = await db.dropTable(target.schema, target.table, "view");
-                  if (result.error) { alert(result.error); } else { await loadTables(target.schema); }
-                  close();
+                  if (result.error) { setInfoDialog({ title: "Error", body: result.error }); } else { await loadTables(target.schema); close(); }
                 }),
               }]
             : [
@@ -263,8 +274,7 @@ export function SchemaContextMenu({ target, position, onClose }: Props) {
                   danger: true,
                   action: withConfirm(`Truncate "${target.schema}"."${target.table}"? All data will be deleted.`, async () => {
                     const result = await db.truncateTable(target.schema, target.table);
-                    if (result.error) { alert(result.error); }
-                    close();
+                    if (result.error) { setInfoDialog({ title: "Error", body: result.error }); } else { close(); }
                   }),
                 },
                 {
@@ -272,8 +282,7 @@ export function SchemaContextMenu({ target, position, onClose }: Props) {
                   danger: true,
                   action: withConfirm(`Drop table "${target.schema}"."${target.table}"? This cannot be undone.`, async () => {
                     const result = await db.dropTable(target.schema, target.table, "table");
-                    if (result.error) { alert(result.error); } else { await loadTables(target.schema); }
-                    close();
+                    if (result.error) { setInfoDialog({ title: "Error", body: result.error }); } else { await loadTables(target.schema); close(); }
                   }),
                 },
               ]
@@ -324,6 +333,33 @@ export function SchemaContextMenu({ target, position, onClose }: Props) {
   }
 
   const items = buildItems();
+
+  if (infoDialog) {
+    return (
+      <div
+        ref={menuRef}
+        className="fixed z-50 min-w-[240px] max-w-[360px] rounded-md border border-border bg-popover shadow-lg"
+        style={{ left: position.x, top: position.y }}
+      >
+        <div className="border-b border-border px-3 py-2 text-xs font-medium text-foreground">
+          {infoDialog.title}
+        </div>
+        <div className="max-h-[320px] overflow-auto px-3 py-2">
+          <pre className="whitespace-pre-wrap break-words font-mono text-[11px] text-muted-foreground">
+            {infoDialog.body}
+          </pre>
+        </div>
+        <div className="flex justify-end border-t border-border px-3 py-2">
+          <button
+            onClick={close}
+            className="rounded bg-primary px-2 py-1 text-xs text-primary-foreground hover:bg-primary/90"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (confirmAction) {
     return (

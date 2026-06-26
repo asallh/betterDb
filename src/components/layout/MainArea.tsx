@@ -30,13 +30,12 @@ export function MainArea() {
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       {/* Tab bar */}
-      <div className="flex items-center border-b border-border bg-card">
+      <div className="app-drag flex items-center border-b border-border bg-card">
         <div className="flex flex-1 overflow-x-auto">
           {/* Table viewer tab (when active) */}
           {activeTable && (
-            <button
-              onClick={() => {}} // already showing
-              className={`group flex items-center gap-1.5 border-r border-border px-3 py-1.5 text-xs font-medium transition-colors ${
+            <div
+              className={`app-no-drag group flex items-center gap-1.5 border-r border-border px-3 py-1.5 text-xs font-medium transition-colors ${
                 showingTable
                   ? "bg-background text-foreground"
                   : "text-muted-foreground hover:bg-accent hover:text-foreground"
@@ -55,7 +54,7 @@ export function MainArea() {
               >
                 <X className="h-3 w-3" />
               </span>
-            </button>
+            </div>
           )}
           {/* Query tabs */}
           {tabs.map((tab) => (
@@ -65,7 +64,7 @@ export function MainArea() {
                 closeTable();
                 setActiveTab(tab.id);
               }}
-              className={`group flex items-center gap-1.5 border-r border-border px-3 py-1.5 text-xs font-medium transition-colors ${
+              className={`app-no-drag group flex items-center gap-1.5 border-r border-border px-3 py-1.5 text-xs font-medium transition-colors ${
                 !showingTable && tab.id === activeTabId
                   ? "bg-background text-foreground"
                   : "text-muted-foreground hover:bg-accent hover:text-foreground"
@@ -86,7 +85,7 @@ export function MainArea() {
             </button>
           ))}
         </div>
-        <div className="flex items-center shrink-0">
+        <div className="app-no-drag flex items-center shrink-0">
           <button
             onClick={() => {
               closeTable();

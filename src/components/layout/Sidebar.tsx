@@ -119,7 +119,7 @@ export function Sidebar() {
       }}
     >
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-border px-2 py-2 shrink-0">
+      <div className="app-drag flex items-center justify-between border-b border-border px-2 py-2 shrink-0">
         {showContent ? (
           <>
             <div
@@ -132,17 +132,17 @@ export function Sidebar() {
               }}
             >
               <div className="flex min-w-0 items-center gap-1 pl-1 text-sm font-semibold tracking-tight">
-                <span className="min-2-0 truncate text-primary">BetterDB</span>
+                <span className="min-w-0 truncate text-primary">BetterDB</span>
                 {versionInfo.stage !== "stable" && (
                   <span
-                    className={`text-secondary text-[10px] mx-3 shrink-0 inline-flex items-center border py-px px-1.5 rounded-full leading-none ${STAGE_STYLES[versionInfo.stage]}`}
+                    className={`text-secondary-foreground text-[10px] mx-3 shrink-0 inline-flex items-center border py-px px-1.5 rounded-full leading-none ${STAGE_STYLES[versionInfo.stage]}`}
                   >
                     {versionInfo.label}
                   </span>
                 )}
               </div>
             </div>
-            <div className="flex gap-0.5 shrink-0">
+            <div className="app-no-drag flex gap-0.5 shrink-0">
               {active && (
                 <>
                   <button
@@ -171,7 +171,7 @@ export function Sidebar() {
             </div>
           </>
         ) : (
-          <div className="flex w-full justify-center">
+          <div className="app-no-drag flex w-full justify-center">
             <button
               onClick={handleExpand}
               className="rounded p-1.5 hover:bg-accent text-muted-foreground"
