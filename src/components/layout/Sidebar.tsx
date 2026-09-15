@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useConnectionStore } from "@/stores/connectionStore";
 import { useSchemaStore } from "@/stores/schemaStore";
+import { useUiStore } from "@/stores/uiStore";
 import { SchemaTree } from "@/components/schema/SchemaTree";
 import { ConnectionPanel } from "@/components/connections/ConnectionPanel";
 import { DatabaseEngineIcon, DatabaseCylinderIcon } from "@/components/icons/DatabaseIcons";
@@ -12,6 +13,7 @@ import {
   Plug,
   PanelLeftClose,
   PanelLeftOpen,
+  Plus,
 } from "lucide-react";
 import { parseVersion } from "../../../shared/version";
 
@@ -36,7 +38,9 @@ export function Sidebar() {
   const connections = useConnectionStore((s) => s.connections);
   const disconnect = useConnectionStore((s) => s.disconnect);
   const refreshAll = useSchemaStore((s) => s.refreshAll);
-  const [panelOpen, setPanelOpen] = useState(false);
+  const panelOpen = useUiStore((s) => s.connectionsPanelOpen);
+  const setPanelOpen = useUiStore((s) => s.setConnectionsPanelOpen);
+  const openConnectionsPanel = useUiStore((s) => s.openConnectionsPanel);
   const [width, setWidth] = useState(DEFAULT_WIDTH);
   const [collapsed, setCollapsed] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
@@ -228,9 +232,24 @@ export function Sidebar() {
             {activeId ? (
               <SchemaTree />
             ) : (
-              <div className="flex flex-col items-center justify-center h-full text-foreground">
-                <Plug className="h-8 w-8 mb-2" strokeWidth={1.5} />
-                <span className="text-xs">No connection</span>
+              <div className="flex h-full flex-col items-center justify-center gap-3 px-3 text-center">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-dashed border-border bg-muted/40">
+                  <Plug className="h-5 w-5 text-muted-foreground" strokeWidth={1.5} />
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-foreground">No connection</p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Add one to browse schemas
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={openConnectionsPanel}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2.5 py-1.5 text-[11px] font-medium text-foreground transition-colors hover:bg-accent"
+                >
+                  <Plus className="h-3 w-3" />
+                  Add connection
+                </button>
               </div>
             )}
           </div>
@@ -269,7 +288,7 @@ export function Sidebar() {
             <button
               onClick={() => {
                 handleExpand();
-                setPanelOpen(true);
+                openConnectionsPanel();
               }}
               className="rounded p-1.5 hover:bg-accent text-muted-foreground"
               title="Connections"
