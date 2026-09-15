@@ -152,7 +152,7 @@ export function ConnectionPanel() {
     useState<{ id: string; name: string } | null>(null);
 
   return (
-    <div className="max-h-80 overflow-auto border-t border-border">
+    <div className="max-h-80 overflow-auto">
       {error && (
         <div className="mx-2 mt-2 rounded border border-destructive/50 bg-destructive/10 px-2 py-1 text-[11px] text-destructive">
           {error}

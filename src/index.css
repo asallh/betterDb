@@ -149,6 +149,11 @@
   }
 }
 
+/* Springy panel/sidebar settle — used via style when needed */
+:root {
+  --ease-snap: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
