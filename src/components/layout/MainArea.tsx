@@ -30,7 +30,7 @@ export function MainArea() {
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       {/* Tab bar */}
-      <div className="app-drag flex items-center border-b border-border bg-card">
+      <div className="app-drag glass flex items-center border-b">
         <div className="flex flex-1 overflow-x-auto">
           {/* Table viewer tab (when active) */}
           {activeTable && (
@@ -146,7 +146,7 @@ export function MainArea() {
 
         {/* Right panel */}
         {rightPanel && (
-          <div className="w-72 border-l border-border bg-card shrink-0 overflow-hidden flex flex-col">
+          <div className="w-72 border-l border-border/60 glass-panel shrink-0 overflow-hidden flex flex-col">
             {rightPanel === "history" ? (
               <QueryHistory />
             ) : (

@@ -25,7 +25,7 @@ export function ConnectionFormModal({ connectionId, onClose }: Props) {
         if (e.target === backdropRef.current) onClose();
       }}
     >
-      <div className="mx-4 w-full max-w-md rounded-lg border border-border bg-popover p-5 shadow-lg">
+      <div className="mx-4 w-full max-w-md rounded-xl border glass-strong p-5">
         <h2 className="mb-4 text-sm font-semibold">
           {connectionId ? "Edit Connection" : "New Connection"}
         </h2>

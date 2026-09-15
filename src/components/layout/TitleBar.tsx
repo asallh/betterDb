@@ -7,5 +7,5 @@ import { isMac } from "@/lib/utils";
  */
 export function TitleBar() {
   if (!isMac) return null;
-  return <div className="app-drag h-7 w-full shrink-0 bg-background" />;
+  return <div className="app-drag glass h-7 w-full shrink-0 border-b" />;
 }

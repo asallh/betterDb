@@ -53,7 +53,7 @@ function ConnectionMenu({
   return (
     <div
       ref={menuRef}
-      className="fixed z-50 min-w-[120px] rounded-md border border-border bg-popover p-1 shadow-lg"
+      className="fixed z-50 min-w-[120px] rounded-md border glass-strong p-1"
       style={{ top: pos.top, left: pos.left, transform: "translateX(-100%)" }}
     >
       <button
@@ -108,7 +108,7 @@ function ConfirmDeleteDialog({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div
         ref={dialogRef}
-        className="mx-4 w-full max-w-sm rounded-lg border border-border bg-popover p-4 shadow-lg"
+        className="mx-4 w-full max-w-sm rounded-xl border glass-strong p-4"
       >
         <h3 className="text-sm font-semibold">Delete connection</h3>
         <p className="mt-2 text-xs text-muted-foreground">

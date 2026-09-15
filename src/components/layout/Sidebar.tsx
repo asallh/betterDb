@@ -20,11 +20,11 @@ import { parseVersion } from "../../../shared/version";
 const versionInfo = parseVersion(__APP_VERSION__);
 
 const STAGE_STYLES: Record<string, string> = {
-  nightly: "bg-purple-400/70 border-purple-500",
-  alpha: "bg-orange-400/70 border-orange-500",
-  beta: "bg-[#93D5FB]/70 border-[#3AA3E8]",
-  rc: "bg-yellow-400/70 border-yellow-500",
-  stable: "bg-green-400/70 border-green-500",
+  nightly: "bg-foreground/10 border-foreground/20 text-foreground",
+  alpha: "bg-foreground/8 border-foreground/15 text-foreground",
+  beta: "bg-foreground/8 border-foreground/15 text-muted-foreground",
+  rc: "bg-foreground/10 border-foreground/20 text-foreground",
+  stable: "bg-foreground/10 border-foreground/20 text-foreground",
 };
 
 const MIN_WIDTH = 180;
@@ -113,7 +113,7 @@ export function Sidebar() {
   return (
     <div
       ref={sidebarRef}
-      className="relative flex h-full flex-col border-r border-border bg-card shrink-0 overflow-hidden"
+      className="glass-panel relative flex h-full flex-col border-r shrink-0 overflow-hidden"
       style={{
         width: currentWidth,
         transition:
@@ -139,7 +139,7 @@ export function Sidebar() {
                 <span className="min-w-0 truncate text-primary">BetterDB</span>
                 {versionInfo.stage !== "stable" && (
                   <span
-                    className={`text-secondary-foreground text-[11px] mx-3 shrink-0 inline-flex items-center border py-0.5 px-1.5 rounded-full leading-none ${STAGE_STYLES[versionInfo.stage]}`}
+                    className={`text-[11px] mx-3 shrink-0 inline-flex items-center border py-0.5 px-1.5 rounded-full leading-none ${STAGE_STYLES[versionInfo.stage]}`}
                   >
                     {versionInfo.label}
                   </span>

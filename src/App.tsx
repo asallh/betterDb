@@ -36,7 +36,7 @@ export default function App() {
   useKeyboardShortcuts();
 
   return (
-    <div className="flex h-screen flex-col bg-background">
+    <div className="app-shell flex h-screen flex-col">
       <TitleBar />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar />

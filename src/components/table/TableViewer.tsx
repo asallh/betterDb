@@ -463,7 +463,7 @@ export function TableViewer({ schema, table }: Props) {
                           </span>
                         )}
                         {info?.isForeignKey && (
-                          <span className="text-[9px] font-normal rounded bg-blue-500/15 text-blue-500 px-1 shrink-0">
+                          <span className="text-[9px] font-normal rounded bg-foreground/8 text-muted-foreground px-1 shrink-0">
                             FK
                           </span>
                         )}

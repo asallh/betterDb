@@ -49,7 +49,7 @@ export function CellExpandModal({ value, column, dataType, onClose }: Props) {
         if (e.target === overlayRef.current) onClose();
       }}
     >
-      <div className="bg-card border border-border rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] flex flex-col m-4">
+      <div className="glass-strong border rounded-xl max-w-2xl w-full max-h-[80vh] flex flex-col m-4">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border px-4 py-2.5 shrink-0">
           <div className="flex items-center gap-2 text-sm font-medium">
