@@ -5,62 +5,63 @@
 @layer base {
   :root {
     color-scheme: light;
-    --background: 0 0% 96.5%;
+    --background: 40 8% 97%;
     --foreground: 0 0% 6%;
     --card: 0 0% 100%;
     --card-foreground: 0 0% 6%;
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 6%;
-    --primary: 0 0% 8%;
-    --primary-foreground: 0 0% 99%;
-    --secondary: 0 0% 94%;
+    /* Deep gold — primary actions only; surfaces stay quiet */
+    --primary: 40 72% 33%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 40 6% 94%;
     --secondary-foreground: 0 0% 12%;
-    --muted: 0 0% 93.5%;
+    --muted: 40 6% 94%;
     --muted-foreground: 0 0% 40%;
-    --accent: 0 0% 92.5%;
-    --accent-foreground: 0 0% 10%;
+    --accent: 40 28% 94%;
+    --accent-foreground: 40 55% 22%;
     --destructive: 0 72% 48%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 86%;
-    --input: 0 0% 86%;
-    --ring: 0 0% 18%;
+    --border: 40 6% 87%;
+    --input: 40 6% 87%;
+    --ring: 40 68% 38%;
     --radius: 0.75rem;
-    --glass: 0 0% 100% / 0.52;
-    --glass-strong: 0 0% 100% / 0.68;
+    --glass: 40 20% 100% / 0.55;
+    --glass-strong: 40 25% 100% / 0.7;
     --glass-border: 0 0% 100% / 0.62;
-    --glass-edge: 0 0% 0% / 0.06;
+    --glass-edge: 40 10% 0% / 0.06;
     --glass-highlight: 0 0% 100% / 0.75;
-    --shell-wash: 0 0% 91%;
+    --shell-wash: 40 10% 92%;
     --ease-snap: cubic-bezier(0.32, 0.72, 0, 1);
   }
 
   .dark {
     color-scheme: dark;
-    --background: 0 0% 7%;
-    --foreground: 0 0% 97%;
-    --card: 0 0% 10%;
-    --card-foreground: 0 0% 97%;
-    --popover: 0 0% 10%;
-    --popover-foreground: 0 0% 97%;
-    --primary: 0 0% 97%;
-    --primary-foreground: 0 0% 8%;
-    --secondary: 0 0% 15%;
-    --secondary-foreground: 0 0% 97%;
-    --muted: 0 0% 15%;
-    --muted-foreground: 0 0% 66%;
-    --accent: 0 0% 17%;
-    --accent-foreground: 0 0% 97%;
+    --background: 40 6% 7%;
+    --foreground: 40 8% 97%;
+    --card: 40 6% 10%;
+    --card-foreground: 40 8% 97%;
+    --popover: 40 6% 10%;
+    --popover-foreground: 40 8% 97%;
+    --primary: 42 78% 54%;
+    --primary-foreground: 40 40% 8%;
+    --secondary: 40 8% 15%;
+    --secondary-foreground: 40 8% 97%;
+    --muted: 40 8% 15%;
+    --muted-foreground: 40 8% 66%;
+    --accent: 40 22% 16%;
+    --accent-foreground: 42 70% 72%;
     --destructive: 0 55% 40%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 18%;
-    --input: 0 0% 18%;
-    --ring: 0 0% 80%;
-    --glass: 0 0% 12% / 0.48;
-    --glass-strong: 0 0% 14% / 0.62;
-    --glass-border: 0 0% 100% / 0.1;
+    --border: 40 8% 18%;
+    --input: 40 8% 18%;
+    --ring: 42 72% 56%;
+    --glass: 40 8% 12% / 0.5;
+    --glass-strong: 40 10% 14% / 0.64;
+    --glass-border: 42 40% 70% / 0.1;
     --glass-edge: 0 0% 0% / 0.35;
-    --glass-highlight: 0 0% 100% / 0.08;
-    --shell-wash: 0 0% 4.5%;
+    --glass-highlight: 42 50% 80% / 0.06;
+    --shell-wash: 40 8% 4.5%;
   }
 }
 
@@ -87,11 +88,11 @@
   }
 
   ::selection {
-    background-color: hsl(var(--foreground) / 0.14);
+    background-color: hsl(var(--primary) / 0.18);
   }
 
   :focus-visible {
-    outline: 2px solid hsl(var(--ring) / 0.55);
+    outline: 2px solid hsl(var(--ring) / 0.65);
     outline-offset: 2px;
     border-radius: calc(var(--radius) - 2px);
   }
@@ -104,9 +105,10 @@
   .app-shell {
     position: relative;
     background:
+      radial-gradient(ellipse 70% 50% at 78% 8%, hsl(var(--primary) / 0.07), transparent 55%),
       radial-gradient(ellipse 90% 55% at 12% -10%, hsl(0 0% 100% / 0.85), transparent 58%),
-      radial-gradient(ellipse 70% 45% at 88% 110%, hsl(0 0% 0% / 0.045), transparent 55%),
-      linear-gradient(165deg, hsl(0 0% 98%) 0%, hsl(var(--background)) 42%, hsl(var(--shell-wash)) 100%);
+      radial-gradient(ellipse 70% 45% at 88% 110%, hsl(0 0% 0% / 0.04), transparent 55%),
+      linear-gradient(165deg, hsl(40 12% 98%) 0%, hsl(var(--background)) 42%, hsl(var(--shell-wash)) 100%);
   }
   .app-shell::before {
     content: "";
@@ -125,9 +127,10 @@
   }
   .dark .app-shell {
     background:
+      radial-gradient(ellipse 65% 45% at 80% 5%, hsl(var(--primary) / 0.1), transparent 55%),
       radial-gradient(ellipse 90% 55% at 18% -8%, hsl(0 0% 100% / 0.05), transparent 55%),
       radial-gradient(ellipse 70% 45% at 90% 110%, hsl(0 0% 100% / 0.025), transparent 50%),
-      linear-gradient(165deg, hsl(0 0% 9%) 0%, hsl(var(--background)) 45%, hsl(var(--shell-wash)) 100%);
+      linear-gradient(165deg, hsl(40 8% 9%) 0%, hsl(var(--background)) 45%, hsl(var(--shell-wash)) 100%);
   }
   .dark .app-shell::before {
     opacity: 0.22;
@@ -177,9 +180,9 @@
     background: hsl(var(--primary));
     color: hsl(var(--primary-foreground));
     box-shadow:
-      inset 0 1px 0 0 hsl(0 0% 100% / 0.14),
-      0 1px 2px hsl(0 0% 0% / 0.12),
-      0 4px 12px hsl(0 0% 0% / 0.1);
+      inset 0 1px 0 0 hsl(42 90% 80% / 0.28),
+      0 1px 2px hsl(40 50% 20% / 0.18),
+      0 4px 14px hsl(40 60% 28% / 0.22);
     transition:
       transform 180ms var(--ease-snap),
       box-shadow 220ms var(--ease-snap),
@@ -192,28 +195,28 @@
     inset: 0;
     background: linear-gradient(
       180deg,
-      hsl(0 0% 100% / 0.12) 0%,
-      transparent 42%,
-      hsl(0 0% 0% / 0.08) 100%
+      hsl(42 100% 88% / 0.22) 0%,
+      transparent 45%,
+      hsl(30 60% 15% / 0.18) 100%
     );
   }
   .btn-premium:hover {
-    filter: brightness(1.06);
+    filter: brightness(1.07);
     box-shadow:
-      inset 0 1px 0 0 hsl(0 0% 100% / 0.16),
-      0 2px 4px hsl(0 0% 0% / 0.12),
-      0 8px 20px hsl(0 0% 0% / 0.12);
+      inset 0 1px 0 0 hsl(42 90% 85% / 0.32),
+      0 2px 4px hsl(40 50% 20% / 0.16),
+      0 8px 22px hsl(40 65% 30% / 0.28);
   }
   .btn-premium:active {
     transform: scale(0.985) translateY(0.5px);
-    filter: brightness(0.97);
+    filter: brightness(0.96);
   }
   .dark .btn-premium::after {
     background: linear-gradient(
       180deg,
-      hsl(0 0% 100% / 0.16) 0%,
-      transparent 45%,
-      hsl(0 0% 0% / 0.12) 100%
+      hsl(42 100% 90% / 0.28) 0%,
+      transparent 48%,
+      hsl(30 40% 10% / 0.2) 100%
     );
   }
 

@@ -8,8 +8,8 @@ export function WelcomeScreen() {
     <div className="relative flex flex-1 items-center justify-center overflow-hidden px-6">
       <div className="relative w-full max-w-[26rem] animate-in fade-in zoom-in-95 duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]">
         <div className="glass-strong rounded-[1.25rem] border px-9 py-11 text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-[1.05rem] border border-black/[0.06] bg-gradient-to-b from-white/80 to-black/[0.03] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.7),0_1px_2px_rgba(0,0,0,0.04)] dark:border-white/10 dark:from-white/10 dark:to-black/20">
-            <Database className="h-7 w-7 text-foreground/90" strokeWidth={1.35} />
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-[1.05rem] border border-primary/15 bg-gradient-to-b from-primary/[0.08] to-transparent shadow-[inset_0_1px_0_0_rgba(255,255,255,0.65),0_1px_2px_rgba(0,0,0,0.04)]">
+            <Database className="h-7 w-7 text-primary" strokeWidth={1.35} />
           </div>
           <h2 className="mt-7 text-[1.35rem] font-semibold tracking-[-0.03em] text-foreground text-balance">
             Connect a database

@@ -20,11 +20,11 @@ import { parseVersion } from "../../../shared/version";
 const versionInfo = parseVersion(__APP_VERSION__);
 
 const STAGE_STYLES: Record<string, string> = {
-  nightly: "bg-foreground/10 border-foreground/20 text-foreground",
-  alpha: "bg-foreground/8 border-foreground/15 text-foreground",
-  beta: "bg-foreground/8 border-foreground/15 text-muted-foreground",
-  rc: "bg-foreground/10 border-foreground/20 text-foreground",
-  stable: "bg-foreground/10 border-foreground/20 text-foreground",
+  nightly: "bg-primary/12 border-primary/25 text-primary",
+  alpha: "bg-primary/10 border-primary/20 text-primary",
+  beta: "bg-primary/10 border-primary/25 text-primary",
+  rc: "bg-primary/12 border-primary/25 text-primary",
+  stable: "bg-primary/10 border-primary/20 text-primary",
 };
 
 const MIN_WIDTH = 180;
@@ -252,7 +252,7 @@ export function Sidebar() {
               </div>
             </div>
           )}
-          <span className="h-2 w-2 rounded-full bg-foreground/70 shrink-0 shadow-[0_0_0_3px_hsl(0_0%_0%/0.06)]" />
+          <span className="h-2 w-2 rounded-full bg-primary shrink-0 shadow-[0_0_0_3px_hsl(var(--primary)/0.18)]" />
         </div>
       )}
 
