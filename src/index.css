@@ -11,8 +11,8 @@
     --card-foreground: 220 20% 10%;
     --popover: 0 0% 100%;
     --popover-foreground: 220 20% 10%;
-    /* Deep teal — primary actions feel inviting without purple/indigo slop */
-    --primary: 187 72% 32%;
+    /* Deep teal — dark enough for white label text at rest and on hover */
+    --primary: 187 78% 26%;
     --primary-foreground: 0 0% 100%;
     --secondary: 210 16% 96%;
     --secondary-foreground: 220 20% 14%;
