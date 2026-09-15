@@ -174,7 +174,9 @@ export function Sidebar() {
                   : "translate-x-0 opacity-100",
               )}
             >
-              <span className="min-w-0 truncate text-primary">BetterDB</span>
+              <span className="min-w-0 truncate text-[13px] font-semibold tracking-[-0.03em] text-foreground">
+                BetterDB
+              </span>
               {versionInfo.stage !== "stable" && (
                 <span
                   className={`text-[11px] mx-3 shrink-0 inline-flex items-center border py-0.5 px-1.5 rounded-full leading-none ${STAGE_STYLES[versionInfo.stage]}`}
@@ -188,26 +190,26 @@ export function Sidebar() {
                 <>
                   <button
                     onClick={() => refreshAll()}
-                    className="rounded-md p-1.5 transition-colors hover:bg-accent"
+                    className="icon-btn p-1.5"
                     title="Refresh schema"
                   >
-                    <RefreshCw className="h-3.5 w-3.5 text-muted-foreground" />
+                    <RefreshCw className="h-3.5 w-3.5" />
                   </button>
                   <button
                     onClick={() => disconnect()}
-                    className="rounded-md p-1.5 transition-colors hover:bg-accent"
+                    className="icon-btn p-1.5"
                     title="Disconnect"
                   >
-                    <LogOut className="h-3.5 w-3.5 text-muted-foreground" />
+                    <LogOut className="h-3.5 w-3.5" />
                   </button>
                 </>
               )}
               <button
                 onClick={handleCollapse}
-                className="rounded-md p-1.5 transition-colors hover:bg-accent"
+                className="icon-btn p-1.5"
                 title="Collapse sidebar"
               >
-                <PanelLeftClose className="h-3.5 w-3.5 text-muted-foreground" />
+                <PanelLeftClose className="h-3.5 w-3.5" />
               </button>
             </div>
           </>
@@ -215,7 +217,7 @@ export function Sidebar() {
           <div className="app-no-drag flex w-full justify-center animate-in fade-in zoom-in-95 duration-200">
             <button
               onClick={handleExpand}
-              className="rounded-md p-1.5 transition-colors hover:bg-accent text-muted-foreground"
+              className="icon-btn p-1.5"
               title="Expand sidebar"
             >
               <PanelLeftOpen className="h-4 w-4" />
@@ -250,7 +252,7 @@ export function Sidebar() {
               </div>
             </div>
           )}
-          <span className="h-2 w-2 rounded-full bg-green-500 shrink-0" />
+          <span className="h-2 w-2 rounded-full bg-foreground/70 shrink-0 shadow-[0_0_0_3px_hsl(0_0%_0%/0.06)]" />
         </div>
       )}
 
@@ -281,7 +283,7 @@ export function Sidebar() {
                 <button
                   type="button"
                   onClick={openConnectionsPanel}
-                  className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background/70 px-2.5 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent"
+                  className="inline-flex items-center gap-1.5 rounded-md border border-border/80 bg-background/60 px-2.5 py-1.5 text-xs font-medium tracking-[-0.01em] text-foreground shadow-[inset_0_1px_0_0_rgba(255,255,255,0.55)] transition-all duration-200 hover:bg-accent active:scale-[0.98]"
                 >
                   <Plus className="h-3 w-3" />
                   Add connection

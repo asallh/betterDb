@@ -13,20 +13,23 @@ export function StatusBar() {
   const result = activeTab?.result;
 
   return (
-    <div className="app-drag glass flex items-center justify-between border-t px-3 py-1 text-xs text-muted-foreground">
-      <div className="flex items-center gap-3">
+    <div className="app-drag glass flex items-center justify-between border-t px-3.5 py-1.5 text-[11px] tracking-[-0.01em] text-muted-foreground">
+      <div className="flex items-center gap-3.5">
         {active ? (
           <>
-            <span className="flex items-center gap-1.5">
+            <span className="flex items-center gap-1.5 font-medium text-foreground/80">
               <DatabaseEngineIcon
                 engine={active.engine}
                 colored
                 className="h-3.5 w-3.5"
               />
-              <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-foreground/35 opacity-50 motion-reduce:hidden" />
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-foreground/70" />
+              </span>
               {active.name}
             </span>
-            <span>
+            <span className="tabular-nums text-muted-foreground/80">
               {active.host}:{active.port}/{active.database}
             </span>
           </>
@@ -36,18 +39,18 @@ export function StatusBar() {
               className="relative flex h-1.5 w-1.5"
               aria-hidden
             >
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-muted-foreground/40 opacity-60 motion-reduce:hidden" />
-              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-muted-foreground/50" />
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-muted-foreground/35 opacity-50 motion-reduce:hidden" />
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-muted-foreground/45" />
             </span>
             Disconnected
           </span>
         )}
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3.5 tabular-nums">
         {result && !result.error && (
           <>
             <span>{result.rowCount} rows</span>
-            <span>{result.durationMs}ms</span>
+            <span className="text-muted-foreground/70">{result.durationMs}ms</span>
           </>
         )}
         {result?.error && (

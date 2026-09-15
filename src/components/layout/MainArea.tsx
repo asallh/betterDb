@@ -41,7 +41,7 @@ export function MainArea() {
                   : "text-muted-foreground hover:bg-accent hover:text-foreground"
               }`}
             >
-              <Table2 className="h-3 w-3 text-orange-500" />
+              <Table2 className="h-3 w-3 text-muted-foreground" />
               <span>
                 {activeTable.schema}.{activeTable.table}
               </span>
