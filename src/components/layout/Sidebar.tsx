@@ -135,7 +135,7 @@ export function Sidebar() {
                 <span className="min-w-0 truncate text-primary">BetterDB</span>
                 {versionInfo.stage !== "stable" && (
                   <span
-                    className={`text-secondary-foreground text-[10px] mx-3 shrink-0 inline-flex items-center border py-px px-1.5 rounded-full leading-none ${STAGE_STYLES[versionInfo.stage]}`}
+                    className={`text-secondary-foreground text-[11px] mx-3 shrink-0 inline-flex items-center border py-0.5 px-1.5 rounded-full leading-none ${STAGE_STYLES[versionInfo.stage]}`}
                   >
                     {versionInfo.label}
                   </span>
