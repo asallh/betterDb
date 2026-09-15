@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect } from "react";
 import { useConnectionStore } from "@/stores/connectionStore";
+import { useUiStore } from "@/stores/uiStore";
 import { ConnectionFormModal } from "./ConnectionFormModal";
 import { DatabaseEngineIcon } from "@/components/icons/DatabaseIcons";
 import {
-  Plus,
   Trash2,
   Plug,
   PlugZap,
@@ -143,9 +143,10 @@ export function ConnectionPanel() {
   const activeConnectionId = useConnectionStore((s) => s.activeConnectionId);
   const isConnecting = useConnectionStore((s) => s.isConnecting);
   const error = useConnectionStore((s) => s.error);
-  const [showForm, setShowForm] = useState(false);
-  const [editingConnectionId, setEditingConnectionId] =
-    useState<string | null>(null);
+  const connectionFormOpen = useUiStore((s) => s.connectionFormOpen);
+  const editingConnectionId = useUiStore((s) => s.editingConnectionId);
+  const openConnectionForm = useUiStore((s) => s.openConnectionForm);
+  const closeConnectionForm = useUiStore((s) => s.closeConnectionForm);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const menuButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const [confirmDeleteConn, setConfirmDeleteConn] =
@@ -159,7 +160,6 @@ export function ConnectionPanel() {
         </div>
       )}
 
-      {/* Connection list */}
       <div className="p-1.5 space-y-0.5">
         {connections.map((conn) => {
           const isActive = conn.id === activeConnectionId;
@@ -229,10 +229,7 @@ export function ConnectionPanel() {
 
               {menuOpenId === conn.id && menuButtonRefs.current[conn.id] && (
                 <ConnectionMenu
-                  onEdit={() => {
-                    setEditingConnectionId(conn.id);
-                    setShowForm(true);
-                  }}
+                  onEdit={() => openConnectionForm(conn.id)}
                   onDelete={() => setConfirmDeleteConn({ id: conn.id, name: conn.name })}
                   onClose={() => setMenuOpenId(null)}
                   anchorRef={{ current: menuButtonRefs.current[conn.id] } as React.RefObject<HTMLButtonElement>}
@@ -249,29 +246,13 @@ export function ConnectionPanel() {
         )}
       </div>
 
-      {/* New Connection button */}
-      <div className="p-1.5 pt-0">
-        <button
-          onClick={() => setShowForm(true)}
-          className="flex w-full items-center justify-center gap-1.5 rounded border border-dashed border-border px-2 py-1.5 text-[11px] text-muted-foreground hover:border-primary hover:text-primary transition-colors"
-        >
-          <Plus className="h-3 w-3" />
-          New Connection
-        </button>
-      </div>
-
-      {/* Connection form modal */}
-      {(showForm || editingConnectionId) && (
+      {connectionFormOpen && (
         <ConnectionFormModal
           connectionId={editingConnectionId}
-          onClose={() => {
-            setShowForm(false);
-            setEditingConnectionId(null);
-          }}
+          onClose={closeConnectionForm}
         />
       )}
 
-      {/* Confirm delete dialog */}
       {confirmDeleteConn && (
         <ConfirmDeleteDialog
           connName={confirmDeleteConn.name}

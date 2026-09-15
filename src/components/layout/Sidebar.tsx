@@ -12,7 +12,6 @@ import {
   Plug,
   PanelLeftClose,
   PanelLeftOpen,
-  Plus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { parseVersion } from "../../../shared/version";
@@ -285,8 +284,8 @@ export function Sidebar() {
                   onClick={openConnectionsPanel}
                   className="inline-flex items-center gap-1.5 rounded-md border border-border/80 bg-background/60 px-2.5 py-1.5 text-xs font-medium tracking-[-0.01em] text-foreground shadow-[inset_0_1px_0_0_rgba(255,255,255,0.55)] transition-all duration-200 hover:bg-accent active:scale-[0.98]"
                 >
-                  <Plus className="h-3 w-3" />
-                  Add connection
+                  <DatabaseCylinderIcon className="h-3 w-3" />
+                  Open connections
                 </button>
               </div>
             )}

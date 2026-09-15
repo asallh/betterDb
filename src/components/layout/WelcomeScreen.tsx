@@ -2,7 +2,7 @@ import { Database, Plus } from "lucide-react";
 import { useUiStore } from "@/stores/uiStore";
 
 export function WelcomeScreen() {
-  const openConnectionsPanel = useUiStore((s) => s.openConnectionsPanel);
+  const openConnectionForm = useUiStore((s) => s.openConnectionForm);
 
   return (
     <div className="relative flex flex-1 items-center justify-center overflow-hidden px-6">
@@ -19,7 +19,7 @@ export function WelcomeScreen() {
           </p>
           <button
             type="button"
-            onClick={openConnectionsPanel}
+            onClick={() => openConnectionForm()}
             className="btn-premium mt-8 inline-flex items-center gap-2 rounded-[0.7rem] px-5 py-2.5 text-[13px] font-medium tracking-[-0.01em]"
           >
             <Plus className="relative z-[1] h-4 w-4" strokeWidth={2.25} />
