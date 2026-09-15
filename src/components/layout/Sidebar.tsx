@@ -238,14 +238,14 @@ export function Sidebar() {
                 </div>
                 <div>
                   <p className="text-xs font-medium text-foreground">No connection</p>
-                  <p className="mt-1 text-[11px] text-muted-foreground">
+                  <p className="mt-1 text-xs text-muted-foreground">
                     Add one to browse schemas
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={openConnectionsPanel}
-                  className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2.5 py-1.5 text-[11px] font-medium text-foreground transition-colors hover:bg-accent"
+                  className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent"
                 >
                   <Plus className="h-3 w-3" />
                   Add connection
