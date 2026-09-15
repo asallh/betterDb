@@ -22,7 +22,20 @@ export default defineConfig({
         vite: {
           build: {
             rollupOptions: {
-              external: ['pg', 'mssql', 'mysql2', 'oracledb', 'better-sqlite3'],
+              external: [
+                'pg',
+                'mssql',
+                'mysql2',
+                'oracledb',
+                'better-sqlite3',
+                'mongodb',
+                'ioredis',
+                'duckdb',
+                'ibm_db',
+                'snowflake-sdk',
+                '@clickhouse/client',
+                '@google-cloud/bigquery',
+              ],
             },
           },
         },

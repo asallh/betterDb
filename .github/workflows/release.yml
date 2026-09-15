@@ -55,7 +55,7 @@ jobs:
           - os: macos-latest
             platform: mac
             builder-target: mac
-          - os: windows-latest
+          - os: windows-2022
             platform: win
             builder-target: win
           - os: ubuntu-latest
@@ -71,11 +71,13 @@ jobs:
           cache: npm
 
       - run: npm ci
+      - name: Rebuild native modules for Electron
+        run: npx --yes @electron/rebuild -f -w better-sqlite3
       - run: npm run lint
       - run: npx tsc --noEmit
 
       - name: Build installers
-        run: npm run build -- --${{ matrix.builder-target }}
+        run: npm run build -- --${{ matrix.builder-target }} --publish never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
 

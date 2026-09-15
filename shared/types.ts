@@ -1,13 +1,25 @@
+export type EngineKind = "sql" | "document" | "keyvalue";
+
+export type QueryLanguage = "sql" | "mongodb" | "redis";
+
 export type DatabaseEngine =
-  | 'postgres'
-  | 'supabase'
-  | 'aws'
-  | 'databricks'
-  | 'sqlserver'
-  | 'oracle'
-  | 'mysql'
-  | 'sqlite'
-  | 'mariadb';
+  | "postgres"
+  | "supabase"
+  | "aws"
+  | "databricks"
+  | "cockroach"
+  | "sqlserver"
+  | "oracle"
+  | "mysql"
+  | "sqlite"
+  | "mariadb"
+  | "duckdb"
+  | "db2"
+  | "snowflake"
+  | "clickhouse"
+  | "bigquery"
+  | "mongodb"
+  | "redis";
 
 export interface ConnectionConfig {
   id: string;
@@ -23,12 +35,26 @@ export interface ConnectionConfig {
   trustServerCertificate?: boolean;
   instanceName?: string;
   color?: string;
+  /** Snowflake account identifier (e.g. xy12345.us-east-1). */
+  account?: string;
+  /** Snowflake warehouse name. */
+  warehouse?: string;
+  /** Snowflake / cloud role. */
+  role?: string;
+  /** BigQuery GCP project id. */
+  projectId?: string;
+  /** Auth hint: password | keyfile | adc */
+  authMethod?: string;
+  /** File path for SQLite/DuckDB/service-account JSON. */
+  filePath?: string;
+  /** Optional full connection / JDBC-style string. */
+  connectionString?: string;
 }
 
 export interface TableInfo {
   schema: string;
   name: string;
-  type: 'table' | 'view';
+  type: "table" | "view";
   rowCountEstimate?: number;
 }
 
@@ -60,7 +86,7 @@ export interface PaginationParams {
   offset: number;
   limit: number;
   orderBy?: string;
-  orderDir?: 'ASC' | 'DESC';
+  orderDir?: "ASC" | "DESC";
 }
 
 export interface CellUpdate {
@@ -68,7 +94,7 @@ export interface CellUpdate {
   table: string;
   column: string;
   value: unknown;
-  primaryKeys: Record<string, unknown>; // PK column -> value to identify the row
+  primaryKeys: Record<string, unknown>;
 }
 
 export interface RowDelete {
