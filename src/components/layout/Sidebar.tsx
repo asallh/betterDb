@@ -151,14 +151,14 @@ export function Sidebar() {
                 <>
                   <button
                     onClick={() => refreshAll()}
-                    className="rounded p-1 hover:bg-accent"
+                    className="rounded-md p-1.5 transition-colors hover:bg-accent"
                     title="Refresh schema"
                   >
                     <RefreshCw className="h-3.5 w-3.5 text-muted-foreground" />
                   </button>
                   <button
                     onClick={() => disconnect()}
-                    className="rounded p-1 hover:bg-accent"
+                    className="rounded-md p-1.5 transition-colors hover:bg-accent"
                     title="Disconnect"
                   >
                     <LogOut className="h-3.5 w-3.5 text-muted-foreground" />
@@ -167,7 +167,7 @@ export function Sidebar() {
               )}
               <button
                 onClick={handleCollapse}
-                className="rounded p-1 hover:bg-accent"
+                className="rounded-md p-1.5 transition-colors hover:bg-accent"
                 title="Collapse sidebar"
               >
                 <PanelLeftClose className="h-3.5 w-3.5 text-muted-foreground" />

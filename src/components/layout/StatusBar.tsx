@@ -32,7 +32,13 @@ export function StatusBar() {
           </>
         ) : (
           <span className="flex items-center gap-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/30" />
+            <span
+              className="relative flex h-1.5 w-1.5"
+              aria-hidden
+            >
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-muted-foreground/40 opacity-60 motion-reduce:hidden" />
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-muted-foreground/50" />
+            </span>
             Disconnected
           </span>
         )}
