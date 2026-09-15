@@ -8,7 +8,7 @@ export function WelcomeScreen() {
     <div className="relative flex flex-1 items-center justify-center overflow-hidden">
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_30%_20%,hsl(187_72%_42%/0.08),transparent_55%),radial-gradient(ellipse_at_80%_80%,hsl(240_5%_10%/0.04),transparent_50%)]"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_30%_20%,hsl(var(--primary)/0.10),transparent_55%),radial-gradient(ellipse_at_80%_85%,hsl(var(--ring)/0.06),transparent_50%)]"
       />
       <div className="relative max-w-md px-6 text-center animate-in fade-in zoom-in-95 duration-500">
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-border bg-card shadow-sm">
