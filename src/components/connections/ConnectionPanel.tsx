@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useConnectionStore } from "@/stores/connectionStore";
 import { useUiStore } from "@/stores/uiStore";
-import { ConnectionFormModal } from "./ConnectionFormModal";
 import { DatabaseEngineIcon } from "@/components/icons/DatabaseIcons";
 import {
   Trash2,
@@ -143,10 +142,7 @@ export function ConnectionPanel() {
   const activeConnectionId = useConnectionStore((s) => s.activeConnectionId);
   const isConnecting = useConnectionStore((s) => s.isConnecting);
   const error = useConnectionStore((s) => s.error);
-  const connectionFormOpen = useUiStore((s) => s.connectionFormOpen);
-  const editingConnectionId = useUiStore((s) => s.editingConnectionId);
   const openConnectionForm = useUiStore((s) => s.openConnectionForm);
-  const closeConnectionForm = useUiStore((s) => s.closeConnectionForm);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const menuButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const [confirmDeleteConn, setConfirmDeleteConn] =
@@ -245,13 +241,6 @@ export function ConnectionPanel() {
           </div>
         )}
       </div>
-
-      {connectionFormOpen && (
-        <ConnectionFormModal
-          connectionId={editingConnectionId}
-          onClose={closeConnectionForm}
-        />
-      )}
 
       {confirmDeleteConn && (
         <ConfirmDeleteDialog
