@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, nativeImage } from 'electron'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import { ConnectionManager } from './db/ConnectionManager'
@@ -27,8 +27,22 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 
 
 let win: BrowserWindow | null
 
+function resolveAppIcon() {
+  const candidates = [
+    path.join(process.env.VITE_PUBLIC || '', 'betterDB.png'),
+    path.join(process.env.APP_ROOT || '', 'build', 'betterDB.png'),
+    path.join(process.env.APP_ROOT || '', 'build', 'betterDB.icns'),
+  ]
+  for (const candidate of candidates) {
+    const image = nativeImage.createFromPath(candidate)
+    if (!image.isEmpty()) return image
+  }
+  return undefined
+}
+
 function createWindow() {
   const isMac = process.platform === 'darwin'
+  const icon = resolveAppIcon()
   win = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -37,6 +51,7 @@ function createWindow() {
     title: 'BetterDB',
     titleBarStyle: isMac ? 'hiddenInset' : 'default',
     ...(isMac ? { trafficLightPosition: { x: 12, y: 8 } } : {}),
+    ...(icon ? { icon } : {}),
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
       contextIsolation: true,
@@ -73,6 +88,10 @@ app.on('activate', () => {
 })
 
 app.whenReady().then(() => {
+  const icon = resolveAppIcon()
+  if (icon && process.platform === 'darwin') {
+    app.dock?.setIcon(icon)
+  }
   registerIpcHandlers(connectionManager)
   createWindow()
 })

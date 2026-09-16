@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="build/betterDB.png" alt="BetterDB" width="120" />
+  <img src="build/betterDB.png" alt="BetterDB" width="128" />
 </p>
 
 <h1 align="center">BetterDB</h1>
