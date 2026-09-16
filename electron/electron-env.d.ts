@@ -28,3 +28,19 @@ interface Window {
     invoke(channel: string, ...args: any[]): Promise<any>
   }
 }
+
+/**
+ * Native optional engine SDKs — externalized in Vite and not installed in CI.
+ * Runtime loads them when the corresponding engine is used.
+ */
+declare module "ibm_db" {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const ibmdb: any
+  export default ibmdb
+}
+
+declare module "duckdb" {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const duckdb: any
+  export default duckdb
+}
