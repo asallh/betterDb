@@ -167,6 +167,34 @@ jobs:
           cp build/icons/nightly/betterDB.icns build/betterDB.icns
           cp build/icons/nightly/betterDB.ico build/betterDB.ico
 
+      - name: Use nightly app identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Distinct appId + productName so Nightly installs beside production.
+          node <<'NODE'
+            const fs = require("node:fs");
+            const path = "electron-builder.json5";
+            let text = fs.readFileSync(path, "utf8");
+            text = text.replace(
+              /appId:\s*"[^"]+"/,
+              'appId: "com.betterdb.app.nightly"'
+            );
+            text = text.replace(
+              /productName:\s*"[^"]+"/,
+              'productName: "BetterDB Nightly"'
+            );
+            if (!/executableName:/.test(text)) {
+              text = text.replace(
+                /productName:\s*"BetterDB Nightly",/,
+                'productName: "BetterDB Nightly",\n  executableName: "BetterDB-Nightly",'
+              );
+            }
+            fs.writeFileSync(path, text);
+            console.log(fs.readFileSync(path, "utf8"));
+          NODE
+          npm pkg set name=betterdb-nightly
+
       - name: Rebuild native modules for Electron
         run: npx --yes @electron/rebuild -f -w better-sqlite3
       - run: npm run lint
@@ -186,9 +214,9 @@ jobs:
           mkdir -p staged
           shopt -s nullglob
           for f in \
-            "release/${version}"/BetterDB-*-Installer.dmg \
-            "release/${version}"/BetterDB-*-Setup.exe \
-            "release/${version}"/BetterDB-Linux-*.AppImage
+            "release/${version}"/BetterDB\ Nightly-*-Installer.dmg \
+            "release/${version}"/BetterDB\ Nightly-*-Setup.exe \
+            "release/${version}"/BetterDB\ Nightly-Linux-*.AppImage
           do
             cp "$f" staged/
           done
@@ -223,9 +251,9 @@ jobs:
           mkdir -p installers
           shopt -s nullglob
           for f in \
-            artifacts/BetterDB-*-Installer.dmg \
-            artifacts/BetterDB-*-Setup.exe \
-            artifacts/BetterDB-Linux-*.AppImage
+            artifacts/BetterDB\ Nightly-*-Installer.dmg \
+            artifacts/BetterDB\ Nightly-*-Setup.exe \
+            artifacts/BetterDB\ Nightly-Linux-*.AppImage
           do
             cp "$f" installers/
           done

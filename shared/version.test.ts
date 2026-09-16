@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   compareVersions,
   decideUpdateGate,
+  appDisplayNameForVersion,
   isNightlyVersion,
   isVersionBehind,
   normalizeVersion,
@@ -67,6 +68,16 @@ describe("isNightlyVersion / updateChannelForVersion", () => {
   it("maps versions onto update channels", () => {
     expect(updateChannelForVersion("0.1.0-nightly.1")).toBe("nightly");
     expect(updateChannelForVersion("0.1.0-beta.1")).toBe("default");
+  });
+});
+
+describe("appDisplayNameForVersion", () => {
+  it("names nightlies distinctly for side-by-side installs", () => {
+    expect(appDisplayNameForVersion("0.1.0-nightly.20250916.abc1234")).toBe(
+      "BetterDB Nightly",
+    );
+    expect(appDisplayNameForVersion("0.1.0-beta.1")).toBe("BetterDB");
+    expect(appDisplayNameForVersion("1.0.0")).toBe("BetterDB");
   });
 });
 
