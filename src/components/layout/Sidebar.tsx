@@ -20,7 +20,7 @@ const versionInfo = resolveVersionInfo(__APP_VERSION__, __APP_CHANNEL__);
 
 const STAGE_STYLES: Record<string, string> = {
   dev: "bg-sky-500/12 border-sky-500/30 text-sky-300",
-  nightly: "bg-primary/12 border-primary/25 text-primary",
+  nightly: "bg-violet-500/12 border-violet-400/30 text-violet-300",
   alpha: "bg-primary/10 border-primary/20 text-primary",
   beta: "bg-primary/10 border-primary/25 text-primary",
   rc: "bg-primary/12 border-primary/25 text-primary",
