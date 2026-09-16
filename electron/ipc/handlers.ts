@@ -32,7 +32,6 @@ export function registerIpcHandlers(manager: ConnectionManager): void {
   // -- Connection management --
   ipcMain.handle(IPC.CONNECTIONS_LIST, async () => {
     const connections = await loadConnections();
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     return connections.map(({ password: _, ...rest }) => ({
       ...rest,
       password: "",

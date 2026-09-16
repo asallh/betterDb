@@ -101,7 +101,7 @@ export function Sidebar() {
         setWidth(newWidth);
       }
 
-      function onMouseUp(_e: MouseEvent) {
+      function onMouseUp() {
         setIsResizing(false);
         document.removeEventListener("mousemove", onMouseMove);
         document.removeEventListener("mouseup", onMouseUp);
