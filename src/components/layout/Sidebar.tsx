@@ -173,6 +173,12 @@ export function Sidebar() {
                   : "translate-x-0 opacity-100",
               )}
             >
+              <img
+                src="/betterDB.png"
+                alt=""
+                className="h-5 w-5 shrink-0 rounded-[5px] object-cover"
+                aria-hidden
+              />
               <span className="min-w-0 truncate text-[13px] font-semibold tracking-[-0.03em] text-foreground">
                 BetterDB
               </span>
