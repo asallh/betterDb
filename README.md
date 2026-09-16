@@ -139,6 +139,18 @@ Releases follow [semver](https://semver.org/) via labels on a `dev` → `main` p
 
 Use `release:skip` only when the `dev` → `main` PR must not cut a version (rare).
 
+### Nightly builds
+
+The **Nightly** workflow (`.github/workflows/nightly.yml`) runs daily at 06:00 UTC (and on manual `workflow_dispatch`) from `dev`:
+
+1. Skips successfully when `dev` HEAD matches the commit of the latest `v*-nightly*` tag.
+2. Otherwise sets an ephemeral version `{base}-nightly.{YYYYMMDD}.{shortsha}` (does not push to `dev`).
+3. Builds macOS / Windows / Linux installers and publishes a GitHub prerelease.
+
+Force-update checks keep channels separate: stable/alpha/beta/rc installs never consider nightlies; nightly installs only update to newer nightlies.
+
+Local `npm` / Vite serve shows a **Dev** pill and uses the blueprint app icon; packaged nightlies show **Nightly** and ship the night-sky icon; stable releases show no stage pill and keep the production icon.
+
 ## Roadmap
 
 - [x] MySQL / MariaDB / SQLite / Oracle adapters
