@@ -5,7 +5,7 @@
 <h1 align="center">BetterDB</h1>
 
 <p align="center">
-  A modern, cross-platform SQL database client built with Electron, React, and TypeScript.
+  A modern, cross-platform database client built with Electron, React, and TypeScript.
 </p>
 
 <p align="center">
@@ -21,26 +21,44 @@
 
 ## About
 
-BetterDB is a lightweight desktop application for managing PostgreSQL and SQL Server databases. It provides an intuitive interface for browsing schemas, writing queries, and editing data — without the bloat of traditional database GUIs.
+BetterDB is a lightweight desktop application for managing SQL warehouses, document stores, and key-value databases. It provides an intuitive interface for browsing schemas, writing queries, and editing data — without the bloat of traditional database GUIs.
+
+## Supported engines
+
+| Engine | Kind | Notes |
+| ------ | ---- | ----- |
+| PostgreSQL | SQL | Also Supabase, AWS/RDS Postgres, Databricks, CockroachDB |
+| MySQL / MariaDB | SQL | |
+| SQL Server | SQL | |
+| Oracle | SQL | Requires Oracle Instant Client locally |
+| SQLite | SQL | File-based |
+| DuckDB | SQL | File-based |
+| IBM DB2 | SQL | Requires IBM Data Server Driver locally |
+| Snowflake | SQL | Account / warehouse / role |
+| ClickHouse | SQL | |
+| BigQuery | SQL | Project ID + ADC or service-account key path |
+| MongoDB | Document | Collections map to tables |
+| Redis | Key-value | DB indexes + key-type browser |
 
 ## Features
 
-- **Connection Manager** — Save and organize PostgreSQL and SQL Server connections with encryption/SSL support. PostgreSQL-compatible hosts include Supabase and AWS RDS.
-- **Schema Explorer** — Browse databases, schemas, tables, and views in a collapsible tree sidebar.
-- **SQL Editor** — Write and execute queries with a CodeMirror-powered editor featuring SQL syntax highlighting and a dark theme.
+- **Connection Manager** — Save and organize connections with encryption/SSL support where applicable.
+- **Schema Explorer** — Browse databases, schemas, tables, collections, and key spaces in a collapsible tree sidebar.
+- **Query Editor** — Write and execute SQL, MongoDB commands, or Redis commands with a CodeMirror-powered editor.
 - **Query Results** — View results in a fast, virtualized table with column type awareness and execution time metrics.
-- **Inline Data Editing** — Edit cell values, insert rows, and delete records directly from the table view.
+- **Inline Data Editing** — Edit cell values, insert rows, and delete records where the engine supports it.
 - **Paginated Table Viewer** — Navigate large tables with server-side pagination and sortable columns.
-- **Foreign Key Introspection** — View column-level foreign key references across your schema.
+- **Foreign Key Introspection** — View column-level foreign key references across SQL schemas.
+- **Query history & saved queries** — Re-run recent queries and keep favorites.
+- **Export** — Export result sets to CSV or JSON.
 
 ## Architecture
 
 ```
 electron/
   ├── db/
-  │   ├── DatabaseAdapter.ts      # Abstract adapter (extensible to other engines)
-  │   ├── PostgresAdapter.ts      # PostgreSQL implementation via node-postgres
-  │   ├── SqlServerAdapter.ts     # SQL Server implementation via mssql
+  │   ├── DatabaseAdapter.ts      # Abstract adapter (SQL / document / key-value)
+  │   ├── *Adapter.ts             # Engine implementations
   │   └── ConnectionManager.ts    # Singleton connection factory
   ├── ipc/
   │   └── handlers.ts             # IPC bridge between main & renderer
@@ -49,11 +67,13 @@ electron/
 src/
   ├── components/
   │   ├── connections/             # Connection form & panel
-  │   ├── query/                   # SQL editor & results
+  │   ├── query/                   # Query editor & results
   │   ├── schema/                  # Schema tree browser
   │   └── table/                   # Virtualized table viewer
   ├── stores/                      # Zustand state management
   └── lib/
+      ├── databaseEngines.ts       # Engine registry & defaults
+      ├── engineCapabilities.ts    # Per-engine UI capabilities
       └── ipc.ts                   # Typed IPC wrapper for renderer
 shared/
   └── types.ts                     # Shared types across processes
@@ -70,7 +90,7 @@ shared/
 | State     | Zustand                            |
 | Editor    | CodeMirror 6                       |
 | Tables    | @tanstack/react-virtual            |
-| Database  | node-postgres (`pg`), `mssql`      |
+| Database  | `pg`, `mssql`, `mysql2`, `oracledb`, `better-sqlite3`, `duckdb`, `ibm_db`, `snowflake-sdk`, `@clickhouse/client`, `@google-cloud/bigquery`, `mongodb`, `ioredis` |
 
 ## Getting Started
 
@@ -104,11 +124,16 @@ npm run lint
 
 ## Roadmap
 
-- [ ] MySQL / SQLite adapter support
-- [ ] Query history and saved queries
-- [ ] Export results to CSV / JSON
+- [x] MySQL / MariaDB / SQLite / Oracle adapters
+- [x] Query history and saved queries
+- [x] Export results to CSV / JSON
+- [x] Multiple query tabs
+- [x] Warehouse + NoSQL coverage (DuckDB, DB2, Snowflake, ClickHouse, BigQuery, MongoDB, Redis)
 - [ ] Table structure editor (DDL)
-- [ ] Multiple query tabs
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for local setup and how to add a new database adapter.
 
 ## License
 

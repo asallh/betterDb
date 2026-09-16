@@ -16,3 +16,7 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
     return ipcRenderer.invoke(channel, ...args)
   },
 })
+
+contextBridge.exposeInMainWorld('env', {
+  platform: process.platform,
+})

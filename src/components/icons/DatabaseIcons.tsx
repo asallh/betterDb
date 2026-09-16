@@ -109,6 +109,93 @@ export function SqlServerIcon({ className = "h-4 w-4", colored = false }: IconPr
   );
 }
 
+/* ─── MySQL ─── */
+export function MySqlIcon({ className = "h-4 w-4", colored = false }: IconProps) {
+  const fill = colored ? "#00758F" : "currentColor";
+  const accent = colored ? "#F29111" : "currentColor";
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none">
+      <path
+        d="M3 15.5c3.8-5.9 8.7-8.7 14.8-8.4 1 .1 1.9.3 2.7.6-1.3.5-2.2 1.2-2.8 2.1-1.3 2-2.8 3.3-4.7 4-2.3.8-5.6.9-10 .3z"
+        fill={fill}
+      />
+      <path
+        d="M14.3 7.5c1.1-2 2.9-3.1 5.4-3.5-.4 1.9-1.3 3.4-2.8 4.5"
+        stroke={accent}
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="16.2" cy="10.4" r="0.8" fill={colored ? "#fff" : "currentColor"} />
+      <path d="M4 17.5c4.2 1.3 8 1 11.5-.8" stroke={fill} strokeWidth="1.7" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/* ─── MariaDB ─── */
+export function MariaDbIcon({ className = "h-4 w-4", colored = false }: IconProps) {
+  const fill = colored ? "#003545" : "currentColor";
+  const accent = colored ? "#C0765A" : "currentColor";
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none">
+      <path
+        d="M4 15.5c1.5-4.8 5.2-7.4 11-7.8 2.8-.2 4.8.4 6 1.7-1.4.4-2.5 1.2-3.3 2.4-1.5 2.4-4 3.9-7.4 4.5-2.2.4-4.3.1-6.3-.8z"
+        fill={fill}
+      />
+      <path
+        d="M7.1 12.8c1.1-2.2 3-3.6 5.7-4.3M3.2 17.9c3.5 1.8 7.4 1.9 11.7.2"
+        stroke={accent}
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+      <circle cx="16.5" cy="10.8" r="0.7" fill={colored ? "#fff" : "currentColor"} />
+    </svg>
+  );
+}
+
+/* ─── Oracle ─── */
+export function OracleIcon({ className = "h-4 w-4", colored = false }: IconProps) {
+  const stroke = colored ? "#C74634" : "currentColor";
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none">
+      <rect
+        x="3"
+        y="6.5"
+        width="18"
+        height="11"
+        rx="5.5"
+        stroke={stroke}
+        strokeWidth="2"
+      />
+      <path d="M8 12h8" stroke={stroke} strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/* ─── SQLite ─── */
+export function SqliteIcon({ className = "h-4 w-4", colored = false }: IconProps) {
+  const fill = colored ? "#0F80CC" : "currentColor";
+  const accent = colored ? "#7FD0FF" : "currentColor";
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none">
+      <path
+        d="M5 3.5h11.5L20 7v13.5H5z"
+        stroke={fill}
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+      <path d="M16.5 3.5V7H20" stroke={fill} strokeWidth="1.8" strokeLinejoin="round" />
+      <path
+        d="M9 18c2.2-4.8 4.1-8 5.8-9.8-1.8 5-2.6 8.8-2.4 11.3"
+        stroke={accent}
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 /* ─── Generic cylinder fallback ─── */
 export function DatabaseCylinderIcon({ className = "h-4 w-4" }: IconProps) {
   return (
@@ -147,6 +234,14 @@ export function DatabaseEngineIcon({
       return <DatabricksIcon className={className} colored={colored} />;
     case "sqlserver":
       return <SqlServerIcon className={className} colored={colored} />;
+    case "mysql":
+      return <MySqlIcon className={className} colored={colored} />;
+    case "mariadb":
+      return <MariaDbIcon className={className} colored={colored} />;
+    case "oracle":
+      return <OracleIcon className={className} colored={colored} />;
+    case "sqlite":
+      return <SqliteIcon className={className} colored={colored} />;
     case "postgres":
     default:
       return <PostgresIcon className={className} colored={colored} />;

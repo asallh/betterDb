@@ -130,7 +130,7 @@ export function SchemaTree() {
                         <ChevronRight className="h-3 w-3 shrink-0" />
                       )}
                       {table.type === "view" ? (
-                        <Eye className="h-3 w-3 shrink-0 text-blue-500" />
+                        <Eye className="h-3 w-3 shrink-0 text-muted-foreground" />
                       ) : (
                         <Table2 className="h-3 w-3 shrink-0 text-orange-500" />
                       )}

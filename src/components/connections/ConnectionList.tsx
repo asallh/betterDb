@@ -1,43 +1,8 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useConnectionStore } from "@/stores/connectionStore";
-import { ConnectionForm } from "./ConnectionForm";
+import { ConnectionFormModal } from "./ConnectionFormModal";
 import { DatabaseEngineIcon } from "@/components/icons/DatabaseIcons";
 import { Plus, Trash2, Plug } from "lucide-react";
-
-function ConnectionFormModal({
-  connectionId,
-  onClose,
-}: {
-  connectionId: string | null;
-  onClose: () => void;
-}) {
-  const backdropRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
-
-  return (
-    <div
-      ref={backdropRef}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-      onMouseDown={(e) => {
-        if (e.target === backdropRef.current) onClose();
-      }}
-    >
-      <div className="mx-4 w-full max-w-md rounded-lg border border-border bg-popover p-5 shadow-lg">
-        <h2 className="mb-4 text-sm font-semibold">
-          {connectionId ? "Edit Connection" : "New Connection"}
-        </h2>
-        <ConnectionForm connectionId={connectionId} onClose={onClose} />
-      </div>
-    </div>
-  );
-}
 
 export function ConnectionList() {
   const connections = useConnectionStore((s) => s.connections);
@@ -60,7 +25,7 @@ export function ConnectionList() {
         <DatabaseEngineIcon engine="postgres" className="mx-auto h-12 w-12 text-primary" />
         <h1 className="mt-4 text-2xl font-bold">BetterDB</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Connect to PostgreSQL or SQL Server
+          Connect to your favorite SQL databases
         </p>
       </div>
 

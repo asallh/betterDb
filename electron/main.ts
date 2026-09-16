@@ -28,12 +28,15 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 
 let win: BrowserWindow | null
 
 function createWindow() {
+  const isMac = process.platform === 'darwin'
   win = new BrowserWindow({
     width: 1280,
     height: 800,
     minWidth: 800,
     minHeight: 500,
     title: 'BetterDB',
+    titleBarStyle: isMac ? 'hiddenInset' : 'default',
+    ...(isMac ? { trafficLightPosition: { x: 12, y: 8 } } : {}),
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
       contextIsolation: true,

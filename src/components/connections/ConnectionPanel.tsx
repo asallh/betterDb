@@ -1,9 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { useConnectionStore } from "@/stores/connectionStore";
-import { ConnectionForm } from "./ConnectionForm";
+import { useUiStore } from "@/stores/uiStore";
 import { DatabaseEngineIcon } from "@/components/icons/DatabaseIcons";
 import {
-  Plus,
   Trash2,
   Plug,
   PlugZap,
@@ -53,7 +52,7 @@ function ConnectionMenu({
   return (
     <div
       ref={menuRef}
-      className="fixed z-50 min-w-[120px] rounded-md border border-border bg-popover p-1 shadow-lg"
+      className="fixed z-50 min-w-[120px] rounded-md border glass-strong p-1"
       style={{ top: pos.top, left: pos.left, transform: "translateX(-100%)" }}
     >
       <button
@@ -105,10 +104,10 @@ function ConfirmDeleteDialog({
   }, [onCancel]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-[2px]">
       <div
         ref={dialogRef}
-        className="mx-4 w-full max-w-sm rounded-lg border border-border bg-popover p-4 shadow-lg"
+        className="mx-4 w-full max-w-sm rounded-2xl border border-border/80 bg-card p-5 shadow-[0_16px_48px_hsl(0_0%_0%/0.28)]"
       >
         <h3 className="text-sm font-semibold">Delete connection</h3>
         <p className="mt-2 text-xs text-muted-foreground">
@@ -135,41 +134,6 @@ function ConfirmDeleteDialog({
   );
 }
 
-function ConnectionFormModal({
-  connectionId,
-  onClose,
-}: {
-  connectionId: string | null;
-  onClose: () => void;
-}) {
-  const backdropRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
-
-  return (
-    <div
-      ref={backdropRef}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-      onMouseDown={(e) => {
-        if (e.target === backdropRef.current) onClose();
-      }}
-    >
-      <div className="mx-4 w-full max-w-md rounded-lg border border-border bg-popover p-5 shadow-lg">
-        <h2 className="mb-4 text-sm font-semibold">
-          {connectionId ? "Edit Connection" : "New Connection"}
-        </h2>
-        <ConnectionForm connectionId={connectionId} onClose={onClose} />
-      </div>
-    </div>
-  );
-}
-
 export function ConnectionPanel() {
   const connections = useConnectionStore((s) => s.connections);
   const connect = useConnectionStore((s) => s.connect);
@@ -178,23 +142,20 @@ export function ConnectionPanel() {
   const activeConnectionId = useConnectionStore((s) => s.activeConnectionId);
   const isConnecting = useConnectionStore((s) => s.isConnecting);
   const error = useConnectionStore((s) => s.error);
-  const [showForm, setShowForm] = useState(false);
-  const [editingConnectionId, setEditingConnectionId] =
-    useState<string | null>(null);
+  const openConnectionForm = useUiStore((s) => s.openConnectionForm);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const menuButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const [confirmDeleteConn, setConfirmDeleteConn] =
     useState<{ id: string; name: string } | null>(null);
 
   return (
-    <div className="max-h-80 overflow-auto border-t border-border">
+    <div className="max-h-80 overflow-auto">
       {error && (
         <div className="mx-2 mt-2 rounded border border-destructive/50 bg-destructive/10 px-2 py-1 text-[11px] text-destructive">
           {error}
         </div>
       )}
 
-      {/* Connection list */}
       <div className="p-1.5 space-y-0.5">
         {connections.map((conn) => {
           const isActive = conn.id === activeConnectionId;
@@ -227,7 +188,7 @@ export function ConnectionPanel() {
               <div className="flex gap-0.5 items-center">
                 {isActive ? (
                   <>
-                    <span className="h-1.5 w-1.5 rounded-full bg-green-500 shrink-0 mr-1" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0 mr-1 shadow-[0_0_0_2px_hsl(var(--primary)/0.2)]" />
                     <button
                       onClick={() => disconnect()}
                       className="rounded p-1 opacity-0 group-hover:opacity-100 hover:bg-destructive/10 text-destructive transition-all"
@@ -264,10 +225,7 @@ export function ConnectionPanel() {
 
               {menuOpenId === conn.id && menuButtonRefs.current[conn.id] && (
                 <ConnectionMenu
-                  onEdit={() => {
-                    setEditingConnectionId(conn.id);
-                    setShowForm(true);
-                  }}
+                  onEdit={() => openConnectionForm(conn.id)}
                   onDelete={() => setConfirmDeleteConn({ id: conn.id, name: conn.name })}
                   onClose={() => setMenuOpenId(null)}
                   anchorRef={{ current: menuButtonRefs.current[conn.id] } as React.RefObject<HTMLButtonElement>}
@@ -284,29 +242,6 @@ export function ConnectionPanel() {
         )}
       </div>
 
-      {/* New Connection button */}
-      <div className="p-1.5 pt-0">
-        <button
-          onClick={() => setShowForm(true)}
-          className="flex w-full items-center justify-center gap-1.5 rounded border border-dashed border-border px-2 py-1.5 text-[11px] text-muted-foreground hover:border-primary hover:text-primary transition-colors"
-        >
-          <Plus className="h-3 w-3" />
-          New Connection
-        </button>
-      </div>
-
-      {/* Connection form modal */}
-      {(showForm || editingConnectionId) && (
-        <ConnectionFormModal
-          connectionId={editingConnectionId}
-          onClose={() => {
-            setShowForm(false);
-            setEditingConnectionId(null);
-          }}
-        />
-      )}
-
-      {/* Confirm delete dialog */}
       {confirmDeleteConn && (
         <ConfirmDeleteDialog
           connName={confirmDeleteConn.name}

@@ -60,6 +60,9 @@ Desktop.ini
 
 # Cursor (local workspace / agent state)
 .cursor/
+CLAUDE.md
+agents.md
+AGENTS.md
 
 # Electron Builder downloads (when cached locally)
 .electron-builder-cache/
