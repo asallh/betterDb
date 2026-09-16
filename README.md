@@ -116,6 +116,22 @@ npm run build
 
 Generates a distributable package in the `release/` directory for your platform.
 
+### Local channel test releases
+
+Build a proper channel-branded installer on your machine (identity, icons, and version). Mutated files are restored afterward so your working tree stays clean:
+
+```bash
+npm run build:nightly   # BetterDB Nightly — night-sky icon, com.betterdb.app.nightly
+npm run build:prod      # BetterDB — production icon + identity
+```
+
+Artifacts land in `release/<version>/`. Pass a platform flag through if needed:
+
+```bash
+npm run build:nightly -- --mac
+npm run build:prod -- --dir   # unpacked app only (faster smoke test)
+```
+
 ### Lint
 
 ```bash
@@ -149,7 +165,7 @@ The **Nightly** workflow (`.github/workflows/nightly.yml`) runs daily at 06:00 U
 
 Force-update checks keep channels separate: stable/alpha/beta/rc installs never consider nightlies; nightly installs only update to newer nightlies.
 
-Local `npm` / Vite serve shows a **Dev** pill and uses the blueprint app icon; packaged nightlies show **Nightly** and ship the night-sky icon; stable releases show no stage pill and keep the production icon.
+Local `npm` / Vite serve shows a **Dev** pill and uses the blueprint app icon; packaged nightlies install as **BetterDB Nightly** (separate app id / data dir from production), show the **Nightly** pill, and ship the night-sky icon; stable releases show no stage pill and keep the production icon.
 
 ## Roadmap
 

@@ -15,10 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Channel-aware force-update gate: nightly installs only consider newer nightlies; non-nightly installs ignore nightly releases.
 - Launch-time hard update gate: builds behind the newest GitHub Release (including prereleases) show a blocking update screen and open the release page. Offline / API failures fail open so the app still runs.
 - **Note:** Only builds that include this checker can be forced to update. Shipping the gate cannot remotely kill older installers that never call GitHub; after the first gated release, each newer release can refuse older gated builds.
+- Local channel packaging commands: `npm run build:nightly` and `npm run build:prod` for side-by-side test installers.
 
 ### Changed
 
 - Hardened the release pipeline so GitHub Releases publish only the three platform installers.
+- Nightly packages install as **BetterDB Nightly** (`com.betterdb.app.nightly`) with a separate user-data directory so they can run beside production.
 
 ## [0.1.0-beta.1] - 2026-06-24
 

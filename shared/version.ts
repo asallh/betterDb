@@ -68,6 +68,11 @@ export function updateChannelForVersion(version: string): UpdateChannel {
   return isNightlyVersion(version) ? "nightly" : "default";
 }
 
+/** OS / window display name — nightlies differ so they can install beside prod. */
+export function appDisplayNameForVersion(version: string): string {
+  return isNightlyVersion(version) ? "BetterDB Nightly" : "BetterDB";
+}
+
 /** Strip leading `v` / whitespace for comparison. */
 export function normalizeVersion(version: string): string {
   return version.trim().replace(/^v/i, "");
