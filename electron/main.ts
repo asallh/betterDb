@@ -1,11 +1,17 @@
-import { app, BrowserWindow, nativeImage } from 'electron'
-import { fileURLToPath } from 'node:url'
-import path from 'node:path'
-import { ConnectionManager } from './db/ConnectionManager'
-import { registerIpcHandlers } from './ipc/handlers'
+import { app, BrowserWindow } from "electron";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
+import { ConnectionManager } from "./db/ConnectionManager";
+import { registerIpcHandlers } from "./ipc/handlers";
+import {
+  registerUpdaterIpcHandlers,
+  setUpdateGateDecision,
+} from "./ipc/updaterHandlers";
+import { checkLatestRelease } from "./updater/checkLatest";
+import { shouldBlockApp } from "../shared/version";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const connectionManager = new ConnectionManager()
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const connectionManager = new ConnectionManager();
 
 // The built directory structure
 //
@@ -16,82 +22,87 @@ const connectionManager = new ConnectionManager()
 // │ │ ├── main.js
 // │ │ └── preload.mjs
 // │
-process.env.APP_ROOT = path.join(__dirname, '..')
+process.env.APP_ROOT = path.join(__dirname, "..");
 
 // 🚧 Use ['ENV_NAME'] avoid vite:define plugin - Vite@2.x
-export const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL']
-export const MAIN_DIST = path.join(process.env.APP_ROOT, 'dist-electron')
-export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
+export const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
+export const MAIN_DIST = path.join(process.env.APP_ROOT, "dist-electron");
+export const RENDERER_DIST = path.join(process.env.APP_ROOT, "dist");
 
-process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 'public') : RENDERER_DIST
+process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
+  ? path.join(process.env.APP_ROOT, "public")
+  : RENDERER_DIST;
 
-let win: BrowserWindow | null
-
-function resolveAppIcon() {
-  const candidates = [
-    path.join(process.env.VITE_PUBLIC || '', 'betterDB.png'),
-    path.join(process.env.APP_ROOT || '', 'build', 'betterDB.png'),
-    path.join(process.env.APP_ROOT || '', 'build', 'betterDB.icns'),
-  ]
-  for (const candidate of candidates) {
-    const image = nativeImage.createFromPath(candidate)
-    if (!image.isEmpty()) return image
-  }
-  return undefined
-}
+let win: BrowserWindow | null;
 
 function createWindow() {
-  const isMac = process.platform === 'darwin'
-  const icon = resolveAppIcon()
+  const isMac = process.platform === "darwin";
+  const isDevServe = Boolean(VITE_DEV_SERVER_URL);
+  const appRoot = process.env.APP_ROOT ?? path.join(__dirname, "..");
+  const windowIcon = isDevServe
+    ? path.join(appRoot, "build", "icons", "dev", "betterDB.png")
+    : undefined;
+
   win = new BrowserWindow({
     width: 1280,
     height: 800,
     minWidth: 800,
     minHeight: 500,
-    title: 'BetterDB',
-    titleBarStyle: isMac ? 'hiddenInset' : 'default',
+    title: "BetterDB",
+    titleBarStyle: isMac ? "hiddenInset" : "default",
     ...(isMac ? { trafficLightPosition: { x: 12, y: 8 } } : {}),
-    ...(icon ? { icon } : {}),
+    ...(windowIcon && !isMac ? { icon: windowIcon } : {}),
     webPreferences: {
-      preload: path.join(__dirname, 'preload.mjs'),
+      preload: path.join(__dirname, "preload.mjs"),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
       webSecurity: true,
     },
-  })
+  });
+
+  if (isMac && isDevServe && windowIcon) {
+    app.dock?.setIcon(windowIcon);
+  }
 
   if (VITE_DEV_SERVER_URL) {
-    win.loadURL(VITE_DEV_SERVER_URL)
+    win.loadURL(VITE_DEV_SERVER_URL);
   } else {
-    // win.loadFile('dist/index.html')
-    win.loadFile(path.join(RENDERER_DIST, 'index.html'))
+    win.loadFile(path.join(RENDERER_DIST, "index.html"));
   }
 }
 
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit()
-    win = null
+app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") {
+    app.quit();
+    win = null;
   }
-})
+});
 
-app.on('activate', () => {
+app.on("activate", () => {
   // On OS X it's common to re-create a window in the app when the
   // dock icon is clicked and there are no other windows open.
   if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow()
+    createWindow();
   }
-})
+});
 
-app.whenReady().then(() => {
-  const icon = resolveAppIcon()
-  if (icon && process.platform === 'darwin') {
-    app.dock?.setIcon(icon)
+app.whenReady().then(async () => {
+  registerUpdaterIpcHandlers();
+
+  const localVersion = app.getVersion();
+  const decision = await checkLatestRelease(localVersion);
+  setUpdateGateDecision(decision);
+
+  const blocked = shouldBlockApp(decision);
+
+  // Do not register DB IPC while the hard gate is active.
+  if (!blocked) {
+    registerIpcHandlers(connectionManager);
   }
-  registerIpcHandlers(connectionManager)
-  createWindow()
-})
+
+  createWindow();
+});

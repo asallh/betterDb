@@ -31,3 +31,17 @@ npm run test:watch
 - Mock `window.electron` / IPC in renderer tests; never import real credentials
 - When fixing a bug, add a regression test
 - When adding a conditional, cover both branches
+
+## OTA hard gate (manual QA)
+
+Version check compares `app.getVersion()` to the newest non-draft GitHub Release for `asallh/betterDb` (prereleases included). Fail-open on network/timeout errors.
+
+Checklist:
+
+- [ ] Packaged build whose version is **behind** the latest GitHub tag shows the force-update screen (no sidebar / DB UI)
+- [ ] **Open download** / **View release notes** opens the release URL in the browser
+- [ ] Packaged build whose version **matches** (or is ahead of) latest opens the normal app
+- [ ] With network blocked / GitHub unreachable, the app still opens (fail-open) and the status bar can show “Update check failed”
+- [ ] Confirm DB IPC is unavailable while the force-update screen is showing (connections cannot load)
+
+Release note reminder: only builds that ship this checker can be forced; pre-gate installers are unaffected until users manually upgrade once.

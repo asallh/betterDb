@@ -36,4 +36,7 @@ export const IPC = {
   SAVED_QUERIES_DELETE: "db:saved:delete",
 
   EXPORT_DATA: "db:export",
+
+  UPDATER_GET_STATUS: "updater:getStatus",
+  UPDATER_OPEN_RELEASE: "updater:openRelease",
 } as const;

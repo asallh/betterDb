@@ -1,8 +1,13 @@
 import { useConnectionStore } from "@/stores/connectionStore";
 import { useQueryStore } from "@/stores/queryStore";
 import { DatabaseEngineIcon } from "@/components/icons/DatabaseIcons";
+import type { UpdateGateDecision } from "../../../shared/version";
 
-export function StatusBar() {
+interface StatusBarProps {
+  updateGate?: UpdateGateDecision | null;
+}
+
+export function StatusBar({ updateGate }: StatusBarProps) {
   const activeId = useConnectionStore((s) => s.activeConnectionId);
   const connections = useConnectionStore((s) => s.connections);
   const activeTabId = useQueryStore((s) => s.activeTabId);
@@ -11,6 +16,7 @@ export function StatusBar() {
   const active = connections.find((c) => c.id === activeId);
   const activeTab = tabs.find((t) => t.id === activeTabId);
   const result = activeTab?.result;
+  const checkFailed = updateGate?.kind === "error";
 
   return (
     <div className="app-drag glass flex items-center justify-between border-t px-3.5 py-1.5 text-[11px] tracking-[-0.01em] text-muted-foreground">
@@ -40,6 +46,11 @@ export function StatusBar() {
               aria-hidden
             />
             Disconnected
+          </span>
+        )}
+        {checkFailed && (
+          <span className="text-muted-foreground/80" title={updateGate.message}>
+            Update check failed
           </span>
         )}
       </div>

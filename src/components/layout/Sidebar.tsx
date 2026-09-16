@@ -14,11 +14,12 @@ import {
   PanelLeftOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { parseVersion } from "../../../shared/version";
+import { resolveVersionInfo } from "../../../shared/version";
 
-const versionInfo = parseVersion(__APP_VERSION__);
+const versionInfo = resolveVersionInfo(__APP_VERSION__, __APP_CHANNEL__);
 
 const STAGE_STYLES: Record<string, string> = {
+  dev: "bg-sky-500/12 border-sky-500/30 text-sky-300",
   nightly: "bg-primary/12 border-primary/25 text-primary",
   alpha: "bg-primary/10 border-primary/20 text-primary",
   beta: "bg-primary/10 border-primary/25 text-primary",

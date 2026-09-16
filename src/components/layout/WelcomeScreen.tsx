@@ -1,8 +1,5 @@
 import { Database, Plus } from "lucide-react";
 import { useUiStore } from "@/stores/uiStore";
-import { parseVersion } from "../../../shared/version";
-
-const versionInfo = parseVersion(__APP_VERSION__);
 
 export function WelcomeScreen() {
   const openConnectionForm = useUiStore((s) => s.openConnectionForm);
@@ -14,16 +11,9 @@ export function WelcomeScreen() {
           <Database className="h-7 w-7 text-primary" strokeWidth={1.5} aria-hidden />
         </div>
 
-        <div className="mt-7 flex items-center gap-2">
-          <h1 className="text-[1.75rem] font-semibold tracking-[-0.04em] text-foreground text-balance">
-            BetterDB
-          </h1>
-          {versionInfo.stage !== "stable" && (
-            <span className="rounded-md border border-border/80 bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-              {versionInfo.label}
-            </span>
-          )}
-        </div>
+        <h1 className="mt-7 text-[1.75rem] font-semibold tracking-[-0.04em] text-foreground text-balance">
+          BetterDB
+        </h1>
 
         <p className="mt-2.5 text-[14px] leading-relaxed tracking-[-0.01em] text-muted-foreground text-pretty">
           Connect a database to get started.

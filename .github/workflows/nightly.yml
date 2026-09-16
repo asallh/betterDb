@@ -1,0 +1,249 @@
+name: Nightly
+
+on:
+  schedule:
+    # 06:00 UTC daily
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      should_build: ${{ steps.decide.outputs.should_build }}
+      version: ${{ steps.decide.outputs.version }}
+      sha: ${{ steps.decide.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 0
+
+      - name: Decide whether to build
+        id: decide
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --tags --force
+
+          HEAD_SHA=$(git rev-parse HEAD)
+          echo "sha=${HEAD_SHA}" >> "$GITHUB_OUTPUT"
+
+          LAST_NIGHTLY=$(node <<'NODE'
+            const { execSync } = require("node:child_process");
+            const tags = execSync("git tag -l 'v*-nightly*'", { encoding: "utf8" })
+              .split("\n")
+              .map((t) => t.trim())
+              .filter(Boolean);
+
+            function normalize(v) {
+              return v.trim().replace(/^v/i, "");
+            }
+            function parseSemVer(version) {
+              const normalized = normalize(version);
+              const match = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+.*)?$/.exec(normalized);
+              if (!match) return null;
+              const prerelease = match[4]
+                ? match[4].split(".").map((part) => (/^\d+$/.test(part) ? Number(part) : part))
+                : [];
+              return {
+                major: Number(match[1]),
+                minor: Number(match[2]),
+                patch: Number(match[3]),
+                prerelease,
+              };
+            }
+            function comparePrereleaseIds(a, b) {
+              const aNum = typeof a === "number";
+              const bNum = typeof b === "number";
+              if (aNum && bNum) return a - b;
+              if (aNum) return -1;
+              if (bNum) return 1;
+              return String(a).localeCompare(String(b));
+            }
+            function compareVersions(a, b) {
+              const left = parseSemVer(a);
+              const right = parseSemVer(b);
+              if (!left && !right) return 0;
+              if (!left) return -1;
+              if (!right) return 1;
+              if (left.major !== right.major) return left.major - right.major;
+              if (left.minor !== right.minor) return left.minor - right.minor;
+              if (left.patch !== right.patch) return left.patch - right.patch;
+              const leftPre = left.prerelease;
+              const rightPre = right.prerelease;
+              if (leftPre.length === 0 && rightPre.length === 0) return 0;
+              if (leftPre.length === 0) return 1;
+              if (rightPre.length === 0) return -1;
+              const len = Math.max(leftPre.length, rightPre.length);
+              for (let i = 0; i < len; i++) {
+                if (i >= leftPre.length) return -1;
+                if (i >= rightPre.length) return 1;
+                const cmp = comparePrereleaseIds(leftPre[i], rightPre[i]);
+                if (cmp !== 0) return cmp;
+              }
+              return 0;
+            }
+
+            if (tags.length === 0) {
+              process.stdout.write("");
+              process.exit(0);
+            }
+            const newest = tags.reduce((best, current) =>
+              compareVersions(current, best) > 0 ? current : best
+            );
+            process.stdout.write(newest);
+          NODE
+          )
+
+          if [ -n "$LAST_NIGHTLY" ]; then
+            LAST_COMMIT=$(git rev-list -n 1 "$LAST_NIGHTLY")
+            echo "Last nightly tag: $LAST_NIGHTLY @ $LAST_COMMIT"
+            if [ "$LAST_COMMIT" = "$HEAD_SHA" ]; then
+              echo "No new commits on dev since last nightly"
+              echo "should_build=false" >> "$GITHUB_OUTPUT"
+              echo "version=" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          else
+            echo "No previous nightly tags found"
+          fi
+
+          BASE=$(node -p "require('./package.json').version.split('-')[0]")
+          DATE=$(date -u +%Y%m%d)
+          SHORT_SHA=$(git rev-parse --short=7 HEAD)
+          VERSION="${BASE}-nightly.${DATE}.${SHORT_SHA}"
+
+          if git rev-parse "v${VERSION}" >/dev/null 2>&1; then
+            echo "::error::Tag v${VERSION} already exists"
+            exit 1
+          fi
+
+          echo "Building nightly version ${VERSION} at ${HEAD_SHA}"
+          echo "should_build=true" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: gate
+    if: needs.gate.outputs.should_build == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            platform: mac
+            builder-target: mac
+          - os: windows-2022
+            platform: win
+            builder-target: win
+          - os: ubuntu-latest
+            platform: linux
+            builder-target: linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.gate.outputs.sha }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Set ephemeral nightly version
+        shell: bash
+        run: npm version "${{ needs.gate.outputs.version }}" --no-git-tag-version
+
+      - name: Use nightly app icons
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp build/icons/nightly/betterDB.png build/betterDB.png
+          cp build/icons/nightly/betterDB.icns build/betterDB.icns
+          cp build/icons/nightly/betterDB.ico build/betterDB.ico
+
+      - name: Rebuild native modules for Electron
+        run: npx --yes @electron/rebuild -f -w better-sqlite3
+      - run: npm run lint
+      - run: npm test
+      - run: npx tsc --noEmit
+
+      - name: Build installers
+        run: npm run build -- --${{ matrix.builder-target }} --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Stage installer only
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${{ needs.gate.outputs.version }}"
+          mkdir -p staged
+          shopt -s nullglob
+          for f in \
+            "release/${version}"/BetterDB-*-Installer.dmg \
+            "release/${version}"/BetterDB-*-Setup.exe \
+            "release/${version}"/BetterDB-Linux-*.AppImage
+          do
+            cp "$f" staged/
+          done
+          count=$(find staged -type f | wc -l | tr -d ' ')
+          if [ "$count" -ne 1 ]; then
+            echo "::error::Expected exactly 1 installer for ${{ matrix.platform }}, found $count"
+            ls -la "release/${version}" || true
+            ls -la staged || true
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: betterdb-${{ needs.gate.outputs.version }}-${{ matrix.platform }}
+          path: staged/*
+          if-no-files-found: error
+
+  publish:
+    needs: [gate, build]
+    if: needs.gate.outputs.should_build == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: betterdb-${{ needs.gate.outputs.version }}-*
+          merge-multiple: true
+
+      - name: Collect installers
+        run: |
+          set -euo pipefail
+          mkdir -p installers
+          shopt -s nullglob
+          for f in \
+            artifacts/BetterDB-*-Installer.dmg \
+            artifacts/BetterDB-*-Setup.exe \
+            artifacts/BetterDB-Linux-*.AppImage
+          do
+            cp "$f" installers/
+          done
+          count=$(find installers -type f | wc -l | tr -d ' ')
+          echo "Installer files:"
+          ls -la installers
+          if [ "$count" -ne 3 ]; then
+            echo "::error::Expected exactly 3 installers (mac/win/linux), found $count"
+            echo "Downloaded artifacts:"
+            find artifacts -type f | sort
+            exit 1
+          fi
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.gate.outputs.version }}
+          target_commitish: ${{ needs.gate.outputs.sha }}
+          name: BetterDB Nightly v${{ needs.gate.outputs.version }}
+          prerelease: true
+          generate_release_notes: true
+          files: installers/*
