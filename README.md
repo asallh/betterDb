@@ -155,13 +155,38 @@ Releases follow [semver](https://semver.org/) via labels on a `dev` → `main` p
 
 Use `release:skip` only when the `dev` → `main` PR must not cut a version (rare).
 
+### macOS code signing (required for CI)
+
+Mac Nightly and Release jobs **fail closed** unless these GitHub Actions secrets are set. Without them, downloaded DMGs hit Gatekeeper’s “damaged and can’t be opened” dialog.
+
+| Secret | Value |
+| --- | --- |
+| `CSC_LINK` | Base64-encoded Developer ID Application `.p12` |
+| `CSC_KEY_PASSWORD` | Password for that `.p12` |
+| `APPLE_API_KEY` | App Store Connect API `.p8` (raw PEM **or** base64) |
+| `APPLE_API_KEY_ID` | 10-character key id |
+| `APPLE_API_ISSUER` | Issuer UUID |
+| `APPLE_TEAM_ID` | 10-character Apple Team ID |
+
+Setup outline:
+
+1. Enroll in the [Apple Developer Program](https://developer.apple.com/programs/).
+2. Create a **Developer ID Application** certificate in Xcode / developer.apple.com, export it as `.p12`, then: `base64 -i YourCert.p12 | pbcopy` → paste into `CSC_LINK`.
+3. In [App Store Connect → Users and Access → Integrations → Team Keys](https://appstoreconnect.apple.com/access/integrations/api), create a Team API key with App Manager access. Download `AuthKey_<KEYID>.p8` once; store Key ID, Issuer ID, and the `.p8` contents (or `base64 -i AuthKey_….p8`) as the secrets above.
+
+Local `npm run build:nightly` / `npm run build:prod` stay **unsigned** on purpose. If Gatekeeper blocks a copied local `.app`:
+
+```bash
+xattr -cr "/Applications/BetterDB-Nightly.app"   # or BetterDB.app for prod
+```
+
 ### Nightly builds
 
 The **Nightly** workflow (`.github/workflows/nightly.yml`) runs daily at 06:00 UTC (and on manual `workflow_dispatch`) from `dev`:
 
 1. Skips successfully when `dev` HEAD matches the commit of the latest `v*-nightly*` tag.
 2. Otherwise sets an ephemeral version `{base}-nightly.{YYYYMMDD}.{shortsha}` (does not push to `dev`).
-3. Builds macOS / Windows / Linux installers and publishes a GitHub prerelease.
+3. Builds macOS / Windows / Linux installers and publishes a GitHub prerelease (Mac is Developer ID–signed and notarized).
 
 Force-update checks keep channels separate: stable/alpha/beta/rc installs never consider nightlies; nightly installs only update to newer nightlies.
 
