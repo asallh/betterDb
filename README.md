@@ -122,6 +122,23 @@ Generates a distributable package in the `release/` directory for your platform.
 npm run lint
 ```
 
+## Releasing
+
+Releases follow [semver](https://semver.org/) via labels on a `dev` → `main` pull request.
+
+1. Land feature work on `dev` through normal PRs.
+2. Open a PR from `dev` into `main`.
+3. Add **exactly one** bump label:
+   - `release:patch` — bug fixes
+   - `release:minor` — new features (backward compatible)
+   - `release:major` — breaking changes
+4. Optionally add one stage label: `release:alpha`, `release:beta`, or `release:rc`. Omit for a stable release.
+5. The **Release PR** workflow bumps `package.json` on `dev` and posts a checklist comment.
+6. Update [CHANGELOG.md](CHANGELOG.md) with user-facing notes, wait for CI green, then merge.
+7. The **Release** workflow builds macOS / Windows / Linux installers and publishes them to [GitHub Releases](https://github.com/asallh/betterDb/releases).
+
+Use `release:skip` only when the `dev` → `main` PR must not cut a version (rare).
+
 ## Roadmap
 
 - [x] MySQL / MariaDB / SQLite / Oracle adapters
