@@ -150,9 +150,9 @@ jobs:
               '### Release checklist',
               `- **Planned version:** \`v${{ steps.version.outputs.next }}\` (${{ steps.bump.outputs.level }} bump${stageNote})`,
               versionStatus,
-              '- [ ] Changelog / PR description lists user-facing changes',
+              '- [ ] `CHANGELOG.md` updated for user-facing changes',
               '- [ ] CI checks pass',
-              '- [ ] After merge, the **Release** workflow tags `main` and publishes installers to GitHub Releases',
+              '- [ ] After merge, the **Release** workflow tags `main` and publishes exactly 3 installers (dmg / exe / AppImage)',
               '',
               marker,
             ].join('\n');

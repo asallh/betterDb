@@ -74,6 +74,7 @@ jobs:
       - name: Rebuild native modules for Electron
         run: npx --yes @electron/rebuild -f -w better-sqlite3
       - run: npm run lint
+      - run: npm test
       - run: npx tsc --noEmit
 
       - name: Build installers
@@ -81,13 +82,32 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
+      - name: Stage installer only
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${{ needs.gate.outputs.version }}"
+          mkdir -p staged
+          shopt -s nullglob
+          for f in \
+            "release/${version}"/BetterDB-*-Installer.dmg \
+            "release/${version}"/BetterDB-*-Setup.exe \
+            "release/${version}"/BetterDB-Linux-*.AppImage
+          do
+            cp "$f" staged/
+          done
+          count=$(find staged -type f | wc -l | tr -d ' ')
+          if [ "$count" -ne 1 ]; then
+            echo "::error::Expected exactly 1 installer for ${{ matrix.platform }}, found $count"
+            ls -la "release/${version}" || true
+            ls -la staged || true
+            exit 1
+          fi
+
       - uses: actions/upload-artifact@v4
         with:
           name: betterdb-${{ needs.gate.outputs.version }}-${{ matrix.platform }}
-          path: |
-            release/${{ needs.gate.outputs.version }}/*.dmg
-            release/${{ needs.gate.outputs.version }}/*.exe
-            release/${{ needs.gate.outputs.version }}/*.AppImage
+          path: staged/*
           if-no-files-found: error
 
   publish:
@@ -100,6 +120,28 @@ jobs:
           pattern: betterdb-${{ needs.gate.outputs.version }}-*
           merge-multiple: true
 
+      - name: Collect installers
+        run: |
+          set -euo pipefail
+          mkdir -p installers
+          shopt -s nullglob
+          for f in \
+            artifacts/BetterDB-*-Installer.dmg \
+            artifacts/BetterDB-*-Setup.exe \
+            artifacts/BetterDB-Linux-*.AppImage
+          do
+            cp "$f" installers/
+          done
+          count=$(find installers -type f | wc -l | tr -d ' ')
+          echo "Installer files:"
+          ls -la installers
+          if [ "$count" -ne 3 ]; then
+            echo "::error::Expected exactly 3 installers (mac/win/linux), found $count"
+            echo "Downloaded artifacts:"
+            find artifacts -type f | sort
+            exit 1
+          fi
+
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.gate.outputs.version }}
@@ -107,7 +149,4 @@ jobs:
           name: BetterDB v${{ needs.gate.outputs.version }}
           prerelease: ${{ needs.gate.outputs.prerelease == 'true' }}
           generate_release_notes: true
-          files: |
-            artifacts/*.dmg
-            artifacts/*.exe
-            artifacts/*.AppImage
+          files: installers/*
