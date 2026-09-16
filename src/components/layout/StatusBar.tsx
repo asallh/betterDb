@@ -23,10 +23,10 @@ export function StatusBar() {
                 colored
                 className="h-3.5 w-3.5"
               />
-              <span className="relative flex h-1.5 w-1.5">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/40 opacity-60 motion-reduce:hidden" />
-                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-primary" />
-              </span>
+              <span
+                className="h-1.5 w-1.5 rounded-full bg-primary"
+                aria-hidden
+              />
               {active.name}
             </span>
             <span className="tabular-nums text-muted-foreground/80">
@@ -36,12 +36,9 @@ export function StatusBar() {
         ) : (
           <span className="flex items-center gap-1.5">
             <span
-              className="relative flex h-1.5 w-1.5"
+              className="h-1.5 w-1.5 rounded-full bg-muted-foreground/45"
               aria-hidden
-            >
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-muted-foreground/35 opacity-50 motion-reduce:hidden" />
-              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-muted-foreground/45" />
-            </span>
+            />
             Disconnected
           </span>
         )}

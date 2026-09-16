@@ -44,12 +44,12 @@ export function CellExpandModal({ value, column, dataType, onClose }: Props) {
   return (
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-[2px]"
       onClick={(e) => {
         if (e.target === overlayRef.current) onClose();
       }}
     >
-      <div className="glass-strong border rounded-xl max-w-2xl w-full max-h-[80vh] flex flex-col m-4">
+      <div className="m-4 flex max-h-[80vh] w-full max-w-2xl flex-col rounded-2xl border border-border/80 bg-card shadow-[0_16px_48px_hsl(0_0%_0%/0.28)]">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border px-4 py-2.5 shrink-0">
           <div className="flex items-center gap-2 text-sm font-medium">

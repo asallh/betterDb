@@ -104,10 +104,10 @@ function ConfirmDeleteDialog({
   }, [onCancel]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-[2px]">
       <div
         ref={dialogRef}
-        className="mx-4 w-full max-w-sm rounded-xl border glass-strong p-4"
+        className="mx-4 w-full max-w-sm rounded-2xl border border-border/80 bg-card p-5 shadow-[0_16px_48px_hsl(0_0%_0%/0.28)]"
       >
         <h3 className="text-sm font-semibold">Delete connection</h3>
         <p className="mt-2 text-xs text-muted-foreground">

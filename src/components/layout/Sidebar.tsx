@@ -9,7 +9,6 @@ import {
   RefreshCw,
   LogOut,
   ChevronUp,
-  Plug,
   PanelLeftClose,
   PanelLeftOpen,
 } from "lucide-react";
@@ -44,6 +43,7 @@ export function Sidebar() {
   const panelOpen = useUiStore((s) => s.connectionsPanelOpen);
   const setPanelOpen = useUiStore((s) => s.setConnectionsPanelOpen);
   const openConnectionsPanel = useUiStore((s) => s.openConnectionsPanel);
+  const openConnectionForm = useUiStore((s) => s.openConnectionForm);
   const [width, setWidth] = useState(DEFAULT_WIDTH);
   const [collapsed, setCollapsed] = useState(false);
   const [contentVisible, setContentVisible] = useState(true);
@@ -189,14 +189,14 @@ export function Sidebar() {
                 <>
                   <button
                     onClick={() => refreshAll()}
-                    className="icon-btn p-1.5"
+                    className="icon-btn flex h-8 w-8 items-center justify-center"
                     title="Refresh schema"
                   >
                     <RefreshCw className="h-3.5 w-3.5" />
                   </button>
                   <button
                     onClick={() => disconnect()}
-                    className="icon-btn p-1.5"
+                    className="icon-btn flex h-8 w-8 items-center justify-center"
                     title="Disconnect"
                   >
                     <LogOut className="h-3.5 w-3.5" />
@@ -205,7 +205,7 @@ export function Sidebar() {
               )}
               <button
                 onClick={handleCollapse}
-                className="icon-btn p-1.5"
+                className="icon-btn flex h-8 w-8 items-center justify-center"
                 title="Collapse sidebar"
               >
                 <PanelLeftClose className="h-3.5 w-3.5" />
@@ -216,7 +216,7 @@ export function Sidebar() {
           <div className="app-no-drag flex w-full justify-center animate-in fade-in zoom-in-95 duration-200">
             <button
               onClick={handleExpand}
-              className="icon-btn p-1.5"
+              className="icon-btn flex h-8 w-8 items-center justify-center"
               title="Expand sidebar"
             >
               <PanelLeftOpen className="h-4 w-4" />
@@ -269,24 +269,40 @@ export function Sidebar() {
             {activeId ? (
               <SchemaTree />
             ) : (
-              <div className="flex h-full flex-col items-center justify-center gap-3 px-3 text-center">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-dashed border-border bg-muted/40">
-                  <Plug className="h-5 w-5 text-muted-foreground" strokeWidth={1.5} />
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-foreground">No connection</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Add one to browse schemas
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={openConnectionsPanel}
-                  className="inline-flex items-center gap-1.5 rounded-md border border-border/80 bg-background/60 px-2.5 py-1.5 text-xs font-medium tracking-[-0.01em] text-foreground shadow-[inset_0_1px_0_0_rgba(255,255,255,0.55)] transition-all duration-200 hover:bg-accent active:scale-[0.98]"
-                >
-                  <DatabaseCylinderIcon className="h-3 w-3" />
-                  Open connections
-                </button>
+              <div className="flex h-full min-h-[6rem] flex-col items-center justify-center gap-2 px-4 text-center">
+                {connections.length > 0 ? (
+                  <>
+                    <p className="text-[12px] font-medium tracking-[-0.01em] text-foreground/80">
+                      Recent connections
+                    </p>
+                    <p className="text-[11px] leading-relaxed text-muted-foreground">
+                      Pick one below to browse schemas.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={openConnectionsPanel}
+                      className="mt-1 text-[11px] font-medium text-primary transition-colors hover:text-primary/80"
+                    >
+                      Show connections
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-[12px] font-medium tracking-[-0.01em] text-foreground/80">
+                      Start a connection
+                    </p>
+                    <p className="text-[11px] leading-relaxed text-muted-foreground">
+                      Add a database to see schemas here.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => openConnectionForm()}
+                      className="mt-1 text-[11px] font-medium text-primary transition-colors hover:text-primary/80"
+                    >
+                      Add connection
+                    </button>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -352,7 +368,7 @@ export function Sidebar() {
                 handleExpand();
                 openConnectionsPanel();
               }}
-              className="rounded-md p-1.5 transition-colors hover:bg-accent text-muted-foreground"
+              className="icon-btn flex h-8 w-8 items-center justify-center text-muted-foreground"
               title="Connections"
             >
               <DatabaseCylinderIcon className="h-4 w-4" />

@@ -299,34 +299,34 @@ export function ConnectionForm({ connectionId, onClose }: Props) {
   }
 
   const inputClass =
-    "w-full rounded border border-input bg-background px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-ring";
+    "w-full rounded-lg border border-input bg-background px-2.5 py-1.5 text-xs outline-none transition-shadow focus:ring-1 focus:ring-ring";
   const uriValid = !connectionString || parseConnectionString(connectionString) !== null;
   const hasRequiredFields =
     (requiresHost(form.engine) ? Boolean(form.host) : true) && Boolean(form.database);
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       {/* Mode toggle */}
-      <div className="flex rounded border border-border text-[11px]">
+      <div className="flex gap-1 border-b border-border text-[12px]">
         <button
           onClick={() => setMode("fields")}
-          className={`flex-1 px-2 py-1 transition-colors ${
+          className={`relative -mb-px px-3 py-2 transition-colors ${
             mode === "fields"
-              ? "bg-primary text-primary-foreground"
-              : "hover:bg-accent"
+              ? "font-medium text-foreground after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:bg-primary"
+              : "text-muted-foreground hover:text-foreground"
           }`}
         >
           Fields
         </button>
         <button
           onClick={() => setMode("uri")}
-          className={`flex-1 px-2 py-1 border-l border-border transition-colors ${
+          className={`relative -mb-px px-3 py-2 transition-colors ${
             mode === "uri"
-              ? "bg-primary text-primary-foreground"
-              : "hover:bg-accent"
+              ? "font-medium text-foreground after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:bg-primary"
+              : "text-muted-foreground hover:text-foreground"
           }`}
         >
-          <span className="flex items-center justify-center gap-1">
+          <span className="flex items-center justify-center gap-1.5">
             <Link className="h-3 w-3" />
             URI
           </span>
@@ -578,14 +578,14 @@ export function ConnectionForm({ connectionId, onClose }: Props) {
       )}
 
       {/* Actions */}
-      <div className="flex gap-1.5">
+      <div className="flex items-center gap-2 pt-1">
         <button
           onClick={handleTest}
           disabled={isTesting || !hasRequiredFields || (mode === "uri" && !uriValid)}
-          className="rounded border border-border px-2 py-1 text-[11px] hover:bg-accent disabled:opacity-40 transition-colors"
+          className="rounded-lg px-2.5 py-1.5 text-[12px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-40"
         >
           {isTesting ? (
-            <Loader2 className="h-3 w-3 animate-spin" />
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
           ) : (
             "Test"
           )}
@@ -593,22 +593,23 @@ export function ConnectionForm({ connectionId, onClose }: Props) {
         <button
           onClick={handleSave}
           disabled={isSaving || !hasRequiredFields}
-          className="rounded border border-border px-2 py-1 text-[11px] hover:bg-accent disabled:opacity-40 transition-colors"
+          className="rounded-lg px-2.5 py-1.5 text-[12px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-40"
         >
           Save
+        </button>
+        <div className="flex-1" />
+        <button
+          onClick={onClose}
+          className="rounded-lg px-3 py-1.5 text-[12px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        >
+          Cancel
         </button>
         <button
           onClick={handleSaveAndConnect}
           disabled={isSaving || !hasRequiredFields || (mode === "uri" && !uriValid)}
-          className="flex-1 rounded bg-primary px-2 py-1 text-[11px] text-primary-foreground hover:bg-primary/90 disabled:opacity-40 transition-colors"
+          className="btn-premium rounded-lg px-3.5 py-1.5 text-[12px] font-medium disabled:opacity-40"
         >
-          {isSaving ? "Connecting..." : "Save & Connect"}
-        </button>
-        <button
-          onClick={onClose}
-          className="rounded border border-border px-2 py-1 text-[11px] hover:bg-accent transition-colors"
-        >
-          Cancel
+          {isSaving ? "Connecting…" : "Save & Connect"}
         </button>
       </div>
     </div>

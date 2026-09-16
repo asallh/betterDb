@@ -20,14 +20,14 @@ export function ConnectionFormModal({ connectionId, onClose }: Props) {
   return (
     <div
       ref={backdropRef}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-[2px]"
       onMouseDown={(e) => {
         if (e.target === backdropRef.current) onClose();
       }}
     >
-      <div className="mx-4 w-full max-w-md rounded-xl border glass-strong p-5">
-        <h2 className="mb-4 text-sm font-semibold">
-          {connectionId ? "Edit Connection" : "New Connection"}
+      <div className="mx-4 w-full max-w-md rounded-2xl border border-border/80 bg-card p-6 shadow-[0_16px_48px_hsl(0_0%_0%/0.28)]">
+        <h2 className="mb-5 text-[15px] font-semibold tracking-[-0.02em] text-foreground">
+          {connectionId ? "Edit connection" : "New connection"}
         </h2>
         <ConnectionForm connectionId={connectionId} onClose={onClose} />
       </div>

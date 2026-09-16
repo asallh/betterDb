@@ -1,34 +1,42 @@
 import { Database, Plus } from "lucide-react";
 import { useUiStore } from "@/stores/uiStore";
+import { parseVersion } from "../../../shared/version";
+
+const versionInfo = parseVersion(__APP_VERSION__);
 
 export function WelcomeScreen() {
   const openConnectionForm = useUiStore((s) => s.openConnectionForm);
 
   return (
     <div className="relative flex flex-1 items-center justify-center overflow-hidden px-6">
-      <div className="relative w-full max-w-[26rem] animate-in fade-in zoom-in-95 duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]">
-        <div className="glass-strong rounded-[1.25rem] border px-9 py-11 text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-[1.05rem] border border-primary/15 bg-gradient-to-b from-primary/[0.08] to-transparent shadow-[inset_0_1px_0_0_rgba(255,255,255,0.65),0_1px_2px_rgba(0,0,0,0.04)]">
-            <Database className="h-7 w-7 text-primary" strokeWidth={1.35} />
-          </div>
-          <h2 className="mt-7 text-[1.35rem] font-semibold tracking-[-0.03em] text-foreground text-balance">
-            Connect a database
-          </h2>
-          <p className="mt-2.5 text-[13px] leading-relaxed tracking-[-0.01em] text-muted-foreground text-pretty">
-            Browse schemas, run queries, and edit rows — start with a connection.
-          </p>
-          <button
-            type="button"
-            onClick={() => openConnectionForm()}
-            className="btn-premium mt-8 inline-flex items-center gap-2 rounded-[0.7rem] px-5 py-2.5 text-[13px] font-medium tracking-[-0.01em]"
-          >
-            <Plus className="relative z-[1] h-4 w-4" strokeWidth={2.25} />
-            <span className="relative z-[1]">Add connection</span>
-          </button>
-          <p className="mt-3.5 text-[11px] tracking-wide text-muted-foreground/80">
-            Or open Connections in the sidebar
-          </p>
+      <div className="relative flex w-full max-w-[22rem] flex-col items-center text-center animate-in fade-in zoom-in-95 duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]">
+        <div className="flex h-14 w-14 items-center justify-center rounded-[1.05rem] border border-primary/25 bg-primary/[0.1] shadow-[0_0_36px_hsl(var(--primary)/0.28),inset_0_1px_0_0_hsl(0_0%_100%/0.1)]">
+          <Database className="h-7 w-7 text-primary" strokeWidth={1.5} aria-hidden />
         </div>
+
+        <div className="mt-7 flex items-center gap-2">
+          <h1 className="text-[1.75rem] font-semibold tracking-[-0.04em] text-foreground text-balance">
+            BetterDB
+          </h1>
+          {versionInfo.stage !== "stable" && (
+            <span className="rounded-md border border-border/80 bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              {versionInfo.label}
+            </span>
+          )}
+        </div>
+
+        <p className="mt-2.5 text-[14px] leading-relaxed tracking-[-0.01em] text-muted-foreground text-pretty">
+          Connect a database to get started.
+        </p>
+
+        <button
+          type="button"
+          onClick={() => openConnectionForm()}
+          className="btn-premium mt-8 inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-[13px] font-medium tracking-[-0.01em]"
+        >
+          <Plus className="h-4 w-4" strokeWidth={2.25} />
+          Add connection
+        </button>
       </div>
     </div>
   );
