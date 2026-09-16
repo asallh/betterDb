@@ -6,6 +6,7 @@ import { SchemaTree } from "@/components/schema/SchemaTree";
 import { ConnectionPanel } from "@/components/connections/ConnectionPanel";
 import { DatabaseEngineIcon, DatabaseCylinderIcon } from "@/components/icons/DatabaseIcons";
 import {
+  Database,
   RefreshCw,
   LogOut,
   ChevronUp,
@@ -173,10 +174,9 @@ export function Sidebar() {
                   : "translate-x-0 opacity-100",
               )}
             >
-              <img
-                src="/betterDB.png"
-                alt=""
-                className="h-5 w-5 shrink-0 rounded-[5px] object-cover"
+              <Database
+                className="h-4 w-4 shrink-0 text-primary"
+                strokeWidth={1.5}
                 aria-hidden
               />
               <span className="min-w-0 truncate text-[13px] font-semibold tracking-[-0.03em] text-foreground">
