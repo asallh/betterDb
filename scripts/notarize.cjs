@@ -146,5 +146,7 @@ exports.default = async function notarizeMacApp(context) {
 
   console.log(`Stapling notarization ticket to ${path.basename(appPath)}…`);
   run("xcrun", ["stapler", "staple", "-v", appPath]);
+  console.log(`Validating staple on ${path.basename(appPath)}…`);
+  run("xcrun", ["stapler", "validate", appPath]);
   console.log(`Notarization complete for ${path.basename(appPath)}`);
 };

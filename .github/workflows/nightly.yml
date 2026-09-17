@@ -2,12 +2,17 @@ name: Nightly
 
 on:
   schedule:
-    # 06:00 UTC daily
+    # 06:00 UTC daily — workflow YAML comes from default branch (main);
+    # always keep this file in sync via the release pipeline.
     - cron: "0 6 * * *"
   workflow_dispatch:
 
 permissions:
   contents: write
+
+concurrency:
+  group: nightly-dev
+  cancel-in-progress: false
 
 jobs:
   gate:
@@ -148,12 +153,7 @@ jobs:
         with:
           ref: ${{ needs.gate.outputs.sha }}
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-
-      - run: npm ci
+      - uses: ./.github/actions/setup-node-build
 
       - name: Set ephemeral nightly version
         shell: bash
@@ -173,6 +173,7 @@ jobs:
           set -euo pipefail
           # Distinct appId + productName so Nightly installs beside production.
           # Publish channel "nightly" → latest-*-nightly.yml for electron-updater.
+          # artifactName uses BetterDB-Nightly (no spaces) for stable CI globs.
           node <<'NODE'
             const fs = require("node:fs");
             const path = "electron-builder.json5";
@@ -191,6 +192,19 @@ jobs:
                 'productName: "BetterDB Nightly",\n  executableName: "BetterDB-Nightly",'
               );
             }
+            // Stable artifact names without spaces (stage-installers matches by extension).
+            text = text.replace(
+              /artifactName:\s*"\$\{productName\}-Mac-\$\{version\}-Installer\.\$\{ext\}"/,
+              'artifactName: "BetterDB-Nightly-Mac-${version}-Installer.${ext}"'
+            );
+            text = text.replace(
+              /artifactName:\s*"\$\{productName\}-Windows-\$\{version\}-Setup\.\$\{ext\}"/,
+              'artifactName: "BetterDB-Nightly-Windows-${version}-Setup.${ext}"'
+            );
+            text = text.replace(
+              /artifactName:\s*"\$\{productName\}-Linux-\$\{version\}\.\$\{ext\}"/,
+              'artifactName: "BetterDB-Nightly-Linux-${version}.${ext}"'
+            );
             if (/channel:\s*"[^"]+"/.test(text)) {
               text = text.replace(/channel:\s*"[^"]+"/, 'channel: "nightly"');
             } else if (/publish:\s*\{/.test(text)) {
@@ -210,44 +224,16 @@ jobs:
           NODE
           npm pkg set name=betterdb-nightly
 
-      - name: Rebuild native modules for Electron
-        run: npx --yes @electron/rebuild -f -w better-sqlite3
-      - run: npm run lint
-      - run: npm test
-      - run: npx tsc --noEmit
-
-      - name: Require Mac signing secrets
+      - name: Setup Mac signing
         if: matrix.platform == 'mac'
-        env:
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
-          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
-          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: |
-          set -euo pipefail
-          missing=0
-          for name in CSC_LINK CSC_KEY_PASSWORD APPLE_API_KEY APPLE_API_KEY_ID APPLE_API_ISSUER APPLE_TEAM_ID; do
-            if [ -z "${!name}" ]; then
-              echo "::error::Missing required Mac signing secret: $name"
-              missing=1
-            fi
-          done
-          if [ "$missing" -ne 0 ]; then
-            echo "::error::Add Developer ID + App Store Connect API secrets before publishing Mac DMGs."
-            exit 1
-          fi
-
-      - name: Prepare Mac signing materials
-        if: matrix.platform == 'mac'
-        env:
-          CSC_LINK_B64: ${{ secrets.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
-          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
-          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
-        run: bash scripts/ci-mac-prepare-signing.sh
+        uses: ./.github/actions/setup-mac-signing
+        with:
+          csc_link: ${{ secrets.CSC_LINK }}
+          csc_key_password: ${{ secrets.CSC_KEY_PASSWORD }}
+          apple_api_key: ${{ secrets.APPLE_API_KEY }}
+          apple_api_key_id: ${{ secrets.APPLE_API_KEY_ID }}
+          apple_api_issuer: ${{ secrets.APPLE_API_ISSUER }}
+          apple_team_id: ${{ secrets.APPLE_TEAM_ID }}
 
       - name: Build Mac installer (signed + notarized)
         if: matrix.platform == 'mac'
@@ -256,37 +242,16 @@ jobs:
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           npm run build -- --mac --publish never
         env:
-          # Do not set CSC_LINK / CSC_KEY_PASSWORD — works around electron-builder #10066
-          # (set-key-partition-list gets the wrong password when using CSC_LINK on macOS 26).
           CSC_IDENTITY_AUTO_DISCOVERY: true
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
-      - name: Verify Mac code signature
+      - name: Verify Mac signature
         if: matrix.platform == 'mac'
-        shell: bash
-        run: |
-          set -euo pipefail
-          version="${{ needs.gate.outputs.version }}"
-          app=$(find "release/${version}" -maxdepth 2 -name "*.app" | head -1)
-          if [ -z "$app" ]; then
-            echo "::error::No .app found under release/${version}"
-            ls -la "release/${version}" || true
-            exit 1
-          fi
-          echo "Verifying $app"
-          codesign --verify --deep --strict --verbose=2 "$app"
-          if codesign -dv --verbose=2 "$app" 2>&1 | grep -qi 'Signature=adhoc'; then
-            echo "::error::Mac app is adhoc-signed; Developer ID signing did not apply"
-            codesign -dv --verbose=2 "$app" 2>&1 || true
-            exit 1
-          fi
-          if ! codesign -dv --verbose=2 "$app" 2>&1 | grep -q 'Authority=Developer ID Application'; then
-            echo "::error::Expected Developer ID Application authority on signed app"
-            codesign -dv --verbose=2 "$app" 2>&1 || true
-            exit 1
-          fi
+        uses: ./.github/actions/verify-mac-signature
+        with:
+          version: ${{ needs.gate.outputs.version }}
 
       - name: Build installers (unsigned)
         if: matrix.platform != 'mac'
@@ -295,30 +260,11 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
       - name: Stage installer
-        shell: bash
-        run: |
-          set -euo pipefail
-          version="${{ needs.gate.outputs.version }}"
-          mkdir -p staged
-          shopt -s nullglob
-          # Minimal nightly upload: one public installer per platform.
-          # Skip zip / yml / blockmap / builder-debug (OTA feeds stay on Release).
-          for f in \
-            "release/${version}"/BetterDB\ Nightly-*-Installer.dmg \
-            "release/${version}"/BetterDB\ Nightly-*-Setup.exe \
-            "release/${version}"/BetterDB\ Nightly-Linux-*.AppImage
-          do
-            cp "$f" staged/
-          done
-          installer_count=$(find staged -type f \( -name '*.dmg' -o -name '*.exe' -o -name '*.AppImage' \) | wc -l | tr -d ' ')
-          if [ "$installer_count" -ne 1 ]; then
-            echo "::error::Expected exactly 1 installer for ${{ matrix.platform }}, found $installer_count"
-            ls -la "release/${version}" || true
-            ls -la staged || true
-            exit 1
-          fi
-          echo "Staged artifacts:"
-          ls -la staged
+        uses: ./.github/actions/stage-installers
+        with:
+          version: ${{ needs.gate.outputs.version }}
+          platform: ${{ matrix.platform }}
+          include_ota: "false"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -331,6 +277,8 @@ jobs:
     if: needs.gate.outputs.should_build == 'true'
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
@@ -342,28 +290,29 @@ jobs:
           set -euo pipefail
           mkdir -p installers
           shopt -s nullglob
-          for f in \
-            artifacts/BetterDB\ Nightly-*-Installer.dmg \
-            artifacts/BetterDB\ Nightly-*-Setup.exe \
-            artifacts/BetterDB\ Nightly-Linux-*.AppImage
-          do
-            cp "$f" installers/
+          for f in artifacts/*; do
+            [ -f "$f" ] || continue
+            case "$f" in
+              *.dmg|*.exe|*.AppImage) cp "$f" installers/ ;;
+            esac
           done
           count=$(find installers -type f \( -name '*.dmg' -o -name '*.exe' -o -name '*.AppImage' \) | wc -l | tr -d ' ')
           echo "Release upload set (installers only):"
           ls -la installers
           if [ "$count" -ne 3 ]; then
             echo "::error::Expected exactly 3 installers (mac/win/linux), found $count"
-            echo "Downloaded artifacts:"
-            find artifacts -type f | sort
+            find artifacts -type f | sort || true
             exit 1
           fi
 
-      - uses: softprops/action-gh-release@v2
+      - name: Publish GitHub Release
+        uses: ./.github/actions/publish-github-release
         with:
-          tag_name: v${{ needs.gate.outputs.version }}
-          target_commitish: ${{ needs.gate.outputs.sha }}
-          name: BetterDB Nightly v${{ needs.gate.outputs.version }}
-          prerelease: true
-          generate_release_notes: true
-          files: installers/*
+          version: ${{ needs.gate.outputs.version }}
+          target_sha: ${{ needs.gate.outputs.sha }}
+          prerelease: "true"
+          make_latest: "false"
+          release_name: BetterDB Nightly v${{ needs.gate.outputs.version }}
+          files_dir: installers
+          min_installers: "3"
+          allow_incomplete_clobber: "true"

@@ -1,0 +1,55 @@
+name: Verify Mac signature
+description: Fail closed unless the built .app is Developer ID–signed, stapled, and Gatekeeper-assessable.
+
+inputs:
+  version:
+    description: package.json / release version (release/${version} output dir)
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Verify Mac code signature and notarization
+      shell: bash
+      run: |
+        set -euo pipefail
+        version="${{ inputs.version }}"
+        app=$(find "release/${version}" -maxdepth 2 -name "*.app" | head -1)
+        if [ -z "$app" ]; then
+          echo "::error::No .app found under release/${version}"
+          ls -la "release/${version}" || true
+          exit 1
+        fi
+
+        echo "Verifying $app"
+        codesign --verify --deep --strict --verbose=2 "$app"
+
+        details=$(codesign -dv --verbose=2 "$app" 2>&1 || true)
+        echo "$details"
+
+        if echo "$details" | grep -qi 'Signature=adhoc'; then
+          echo "::error::Mac app is adhoc-signed; Developer ID signing did not apply"
+          exit 1
+        fi
+        if ! echo "$details" | grep -q 'Authority=Developer ID Application'; then
+          echo "::error::Expected Developer ID Application authority on signed app"
+          exit 1
+        fi
+
+        echo "Validating notarization staple on .app…"
+        xcrun stapler validate "$app"
+
+        dmg=$(find "release/${version}" -maxdepth 1 -name "*.dmg" | head -1 || true)
+        if [ -n "$dmg" ]; then
+          echo "Validating notarization staple on DMG (best-effort)…"
+          if ! xcrun stapler validate "$dmg"; then
+            echo "::warning::DMG is not stapled; Gatekeeper may need online notary check on first open"
+          fi
+        fi
+
+        echo "Gatekeeper assess (best-effort)…"
+        if ! spctl --assess --type execute --verbose=4 "$app"; then
+          echo "::warning::spctl assess failed on runner; codesign + stapler validate already passed"
+        fi
+
+        echo "Mac signature + notarization checks passed for $app"

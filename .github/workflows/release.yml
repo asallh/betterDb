@@ -1,53 +1,115 @@
 name: Release
 
 on:
-  pull_request:
-    types: [closed]
+  push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Rebuild and clobber assets even if a complete release already exists
+        type: boolean
+        default: false
 
 permissions:
   contents: write
+  pull-requests: read
+
+concurrency:
+  group: release-main
+  cancel-in-progress: false
 
 jobs:
   gate:
-    if: |
-      github.event.pull_request.merged == true &&
-      github.event.pull_request.head.ref == 'dev' &&
-      github.event.pull_request.base.ref == 'main'
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.pkg.outputs.version }}
-      prerelease: ${{ steps.pkg.outputs.prerelease }}
+      should_build: ${{ steps.decide.outputs.should_build }}
+      version: ${{ steps.decide.outputs.version }}
+      prerelease: ${{ steps.decide.outputs.prerelease }}
+      sha: ${{ steps.decide.outputs.sha }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - id: pkg
+      - name: Decide whether to release
+        id: decide
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          FORCE: ${{ github.event_name == 'workflow_dispatch' && inputs.force == true }}
         run: |
+          set -euo pipefail
+          SHA="${{ github.sha }}"
+          echo "sha=${SHA}" >> "$GITHUB_OUTPUT"
+
           version=$(node -p "require('./package.json').version")
-          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+          if [ "$version" = "0.0.0" ]; then
+            echo "::error::Bump package.json on dev before merging to main"
+            exit 1
+          fi
+
           if echo "$version" | grep -q '-'; then
             echo "prerelease=true" >> "$GITHUB_OUTPUT"
           else
             echo "prerelease=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Fail if version is placeholder
-        run: |
-          if [ "${{ steps.pkg.outputs.version }}" = "0.0.0" ]; then
-            echo "::error::Bump package.json on dev before merging to main"
-            exit 1
+          # workflow_dispatch can force a rebuild of the version on main.
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Manual dispatch for v${version}"
+          else
+            # Require this push to come from a merged PR whose head was `dev`.
+            pr_json=$(gh api "repos/${GH_REPO}/commits/${SHA}/pulls" \
+              -H "Accept: application/vnd.github.groot-preview+json" || echo "[]")
+            head_ref=$(echo "$pr_json" | jq -r '
+              map(select(.base.ref == "main" and .merged_at != null))
+              | .[0].head.ref // empty
+            ')
+            if [ -z "$head_ref" ]; then
+              # Squash merges still associate; if none, try message "(#N)".
+              pr_num=$(git log -1 --pretty=%B | grep -oE '#[0-9]+' | head -1 | tr -d '#' || true)
+              if [ -n "$pr_num" ]; then
+                head_ref=$(gh pr view "$pr_num" --repo "$GH_REPO" --json headRefName -q .headRefName || true)
+                base_ref=$(gh pr view "$pr_num" --repo "$GH_REPO" --json baseRefName -q .baseRefName || true)
+                if [ "$base_ref" != "main" ]; then
+                  head_ref=""
+                fi
+              fi
+            fi
+
+            if [ "$head_ref" != "dev" ]; then
+              echo "Push to main is not from a merged dev→main PR (head=${head_ref:-none}); skipping release"
+              echo "should_build=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "Confirmed merged PR from dev → main"
           fi
 
-      - name: Fail if tag already exists
-        run: |
-          git fetch --tags
-          if git rev-parse "v${{ steps.pkg.outputs.version }}" >/dev/null 2>&1; then
-            echo "::error::Tag v${{ steps.pkg.outputs.version }} already exists"
-            exit 1
+          tag="v${version}"
+          git fetch --tags --force
+
+          if gh release view "$tag" --repo "$GH_REPO" >/dev/null 2>&1; then
+            installer_count=$(gh release view "$tag" --repo "$GH_REPO" --json assets \
+              --jq '[.assets[].name] | map(select(test("\\.(dmg|exe|AppImage)$"))) | length')
+            echo "Existing release ${tag} has ${installer_count} installer(s)"
+            if [ "$installer_count" -ge 3 ] && [ "$FORCE" != "true" ]; then
+              echo "Complete release already exists; skipping (use workflow_dispatch force=true to rebuild)"
+              echo "should_build=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "Incomplete or forced rebuild — will clobber assets"
+          elif git rev-parse "$tag" >/dev/null 2>&1; then
+            echo "Tag ${tag} exists without a complete release; will recreate/upload"
           fi
+
+          echo "should_build=true" >> "$GITHUB_OUTPUT"
+          echo "Building production release v${version} at ${SHA}"
 
   build:
     needs: gate
+    if: needs.gate.outputs.should_build == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -64,51 +126,21 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: npm
+          ref: ${{ needs.gate.outputs.sha }}
 
-      - run: npm ci
-      - name: Rebuild native modules for Electron
-        run: npx --yes @electron/rebuild -f -w better-sqlite3
-      - run: npm run lint
-      - run: npm test
-      - run: npx tsc --noEmit
+      - uses: ./.github/actions/setup-node-build
 
-      - name: Require Mac signing secrets
+      - name: Setup Mac signing
         if: matrix.platform == 'mac'
-        env:
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
-          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
-          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: |
-          set -euo pipefail
-          missing=0
-          for name in CSC_LINK CSC_KEY_PASSWORD APPLE_API_KEY APPLE_API_KEY_ID APPLE_API_ISSUER APPLE_TEAM_ID; do
-            if [ -z "${!name}" ]; then
-              echo "::error::Missing required Mac signing secret: $name"
-              missing=1
-            fi
-          done
-          if [ "$missing" -ne 0 ]; then
-            echo "::error::Add Developer ID + App Store Connect API secrets before publishing Mac DMGs."
-            exit 1
-          fi
-
-      - name: Prepare Mac signing materials
-        if: matrix.platform == 'mac'
-        env:
-          CSC_LINK_B64: ${{ secrets.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
-          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
-          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
-        run: bash scripts/ci-mac-prepare-signing.sh
+        uses: ./.github/actions/setup-mac-signing
+        with:
+          csc_link: ${{ secrets.CSC_LINK }}
+          csc_key_password: ${{ secrets.CSC_KEY_PASSWORD }}
+          apple_api_key: ${{ secrets.APPLE_API_KEY }}
+          apple_api_key_id: ${{ secrets.APPLE_API_KEY_ID }}
+          apple_api_issuer: ${{ secrets.APPLE_API_ISSUER }}
+          apple_team_id: ${{ secrets.APPLE_TEAM_ID }}
 
       - name: Build Mac installer (signed + notarized)
         if: matrix.platform == 'mac'
@@ -118,39 +150,16 @@ jobs:
           npm run build -- --mac --publish never
         env:
           # Do not set CSC_LINK / CSC_KEY_PASSWORD — works around electron-builder #10066
-          # (set-key-partition-list gets the wrong password when using CSC_LINK on macOS 26).
           CSC_IDENTITY_AUTO_DISCOVERY: true
-          # Release is triggered by a merged pull_request event; without this,
-          # electron-builder skips signing and notarization returns Invalid.
-          CSC_FOR_PULL_REQUEST: true
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
-      - name: Verify Mac code signature
+      - name: Verify Mac signature
         if: matrix.platform == 'mac'
-        shell: bash
-        run: |
-          set -euo pipefail
-          version="${{ needs.gate.outputs.version }}"
-          app=$(find "release/${version}" -maxdepth 2 -name "*.app" | head -1)
-          if [ -z "$app" ]; then
-            echo "::error::No .app found under release/${version}"
-            ls -la "release/${version}" || true
-            exit 1
-          fi
-          echo "Verifying $app"
-          codesign --verify --deep --strict --verbose=2 "$app"
-          if codesign -dv --verbose=2 "$app" 2>&1 | grep -qi 'Signature=adhoc'; then
-            echo "::error::Mac app is adhoc-signed; Developer ID signing did not apply"
-            codesign -dv --verbose=2 "$app" 2>&1 || true
-            exit 1
-          fi
-          if ! codesign -dv --verbose=2 "$app" 2>&1 | grep -q 'Authority=Developer ID Application'; then
-            echo "::error::Expected Developer ID Application authority on signed app"
-            codesign -dv --verbose=2 "$app" 2>&1 || true
-            exit 1
-          fi
+        uses: ./.github/actions/verify-mac-signature
+        with:
+          version: ${{ needs.gate.outputs.version }}
 
       - name: Build installers (unsigned)
         if: matrix.platform != 'mac'
@@ -159,41 +168,11 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
       - name: Stage installer and update metadata
-        shell: bash
-        run: |
-          set -euo pipefail
-          version="${{ needs.gate.outputs.version }}"
-          mkdir -p staged
-          shopt -s nullglob
-          for f in \
-            "release/${version}"/BetterDB-*-Installer.dmg \
-            "release/${version}"/BetterDB-*-Setup.exe \
-            "release/${version}"/BetterDB-Linux-*.AppImage
-          do
-            cp "$f" staged/
-          done
-          installer_count=$(find staged -type f \( -name '*.dmg' -o -name '*.exe' -o -name '*.AppImage' \) | wc -l | tr -d ' ')
-          if [ "$installer_count" -ne 1 ]; then
-            echo "::error::Expected exactly 1 installer for ${{ matrix.platform }}, found $installer_count"
-            ls -la "release/${version}" || true
-            ls -la staged || true
-            exit 1
-          fi
-          # electron-updater feed files (yml + blockmap) and Mac zip for silent OTA.
-          # Skip builder-debug.yml — noise that only adds upload volume.
-          for f in \
-            "release/${version}"/*.yml \
-            "release/${version}"/*.blockmap \
-            "release/${version}"/BetterDB-*-Installer.zip
-          do
-            base=$(basename "$f")
-            if [ "$base" = "builder-debug.yml" ]; then
-              continue
-            fi
-            cp "$f" staged/
-          done
-          echo "Staged artifacts:"
-          ls -la staged
+        uses: ./.github/actions/stage-installers
+        with:
+          version: ${{ needs.gate.outputs.version }}
+          platform: ${{ matrix.platform }}
+          include_ota: "true"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -203,11 +182,10 @@ jobs:
 
   publish:
     needs: [gate, build]
+    if: needs.gate.outputs.should_build == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - uses: actions/download-artifact@v4
         with:
@@ -220,85 +198,31 @@ jobs:
           set -euo pipefail
           mkdir -p installers
           shopt -s nullglob
-          for f in \
-            artifacts/BetterDB-*-Installer.dmg \
-            artifacts/BetterDB-*-Setup.exe \
-            artifacts/BetterDB-Linux-*.AppImage
-          do
-            cp "$f" installers/
-          done
-          count=$(find installers -type f \( -name '*.dmg' -o -name '*.exe' -o -name '*.AppImage' \) | wc -l | tr -d ' ')
-          echo "Installer files:"
-          ls -la installers
-          if [ "$count" -ne 3 ]; then
-            echo "::error::Expected exactly 3 installers (mac/win/linux), found $count"
-            echo "Downloaded artifacts:"
-            find artifacts -type f | sort
-            exit 1
-          fi
-          for f in \
-            artifacts/*.yml \
-            artifacts/*.blockmap \
-            artifacts/BetterDB-*-Installer.zip
-          do
+          for f in artifacts/*; do
+            [ -f "$f" ] || continue
             base=$(basename "$f")
             if [ "$base" = "builder-debug.yml" ]; then
               continue
             fi
             cp "$f" installers/
           done
+          count=$(find installers -type f \( -name '*.dmg' -o -name '*.exe' -o -name '*.AppImage' \) | wc -l | tr -d ' ')
           echo "Release upload set:"
           ls -la installers
-
-      # Sequential upload with retries — softprops parallel uploads often hit
-      # GitHub "Error saving asset" / Unicorn on the ~100MB+ installers.
-      - name: Publish GitHub Release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_REPO: ${{ github.repository }}
-          VERSION: ${{ needs.gate.outputs.version }}
-          PRERELEASE: ${{ needs.gate.outputs.prerelease }}
-        run: |
-          set -euo pipefail
-          tag="v${VERSION}"
-          sha="${{ github.sha }}"
-
-          if gh release view "$tag" >/dev/null 2>&1; then
-            echo "Release $tag already exists; will clobber assets on upload"
-          else
-            create_args=(--repo "$GH_REPO" --target "$sha" --title "BetterDB ${tag}" --generate-notes)
-            if [ "$PRERELEASE" = "true" ]; then
-              create_args+=(--prerelease)
-            else
-              create_args+=(--latest)
-            fi
-            gh release create "$tag" "${create_args[@]}"
-          fi
-
-          shopt -s nullglob
-          files=(installers/*)
-          if [ "${#files[@]}" -eq 0 ]; then
-            echo "::error::No files to upload under installers/"
+          if [ "$count" -ne 3 ]; then
+            echo "::error::Expected exactly 3 installers (mac/win/linux), found $count"
+            find artifacts -type f | sort || true
             exit 1
           fi
 
-          for f in "${files[@]}"; do
-            name=$(basename "$f")
-            ok=0
-            for attempt in 1 2 3 4 5; do
-              echo "Uploading ${name} (attempt ${attempt}/5)..."
-              if gh release upload "$tag" "$f" --repo "$GH_REPO" --clobber; then
-                ok=1
-                break
-              fi
-              echo "Upload failed for ${name}; sleeping before retry..."
-              sleep $((attempt * 15))
-            done
-            if [ "$ok" -ne 1 ]; then
-              echo "::error::Failed to upload ${name} after 5 attempts"
-              exit 1
-            fi
-          done
-
-          echo "Published ${tag} with ${#files[@]} assets:"
-          gh release view "$tag" --repo "$GH_REPO" --json assets --jq '[.assets[].name] | sort | .[]'
+      - name: Publish GitHub Release
+        uses: ./.github/actions/publish-github-release
+        with:
+          version: ${{ needs.gate.outputs.version }}
+          target_sha: ${{ needs.gate.outputs.sha }}
+          prerelease: ${{ needs.gate.outputs.prerelease }}
+          make_latest: ${{ needs.gate.outputs.prerelease == 'true' && 'false' || 'true' }}
+          release_name: BetterDB v${{ needs.gate.outputs.version }}
+          files_dir: installers
+          min_installers: "3"
+          allow_incomplete_clobber: "true"
