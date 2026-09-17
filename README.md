@@ -159,6 +159,8 @@ Use `release:skip` only when the `dev` → `main` PR must not cut a version (rar
 
 Mac Nightly and Release jobs **fail closed** unless these GitHub Actions secrets are set. Without them, downloaded DMGs hit Gatekeeper’s “damaged and can’t be opened” dialog.
 
+CI imports the `.p12` into a temporary keychain and uses identity auto-discovery (workaround for [electron-builder #10066](https://github.com/electron-userland/electron-builder/issues/10066) on macOS 26 runners). The same secrets power both **Nightly** and **Release**.
+
 | Secret | Value |
 | --- | --- |
 | `CSC_LINK` | Base64-encoded Developer ID Application `.p12` |
