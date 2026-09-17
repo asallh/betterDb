@@ -231,50 +231,18 @@ jobs:
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
-        run: |
-          set -euo pipefail
-
-          P12_PATH="${RUNNER_TEMP}/developer-id.p12"
-          if printf '%s' "$CSC_LINK_B64" | head -c 40 | grep -q "BEGIN"; then
-            echo "::error::CSC_LINK looks like PEM text. Export Developer ID Application as a .p12 from Keychain, then base64-encode that file."
-            exit 1
-          fi
-          # Strip whitespace so wrapped base64 still decodes cleanly.
-          printf '%s' "$CSC_LINK_B64" | tr -d '\n\r\t ' | base64 --decode > "$P12_PATH"
-          chmod 600 "$P12_PATH"
-          if [ ! -s "$P12_PATH" ]; then
-            echo "::error::Decoded CSC_LINK is empty. Re-encode with: base64 -i YourCert.p12 | tr -d '\\n' | pbcopy"
-            exit 1
-          fi
-
-          # Fail with a clear message if the password does not unlock the .p12.
-          if ! openssl pkcs12 -in "$P12_PATH" -passin pass:"$CSC_KEY_PASSWORD" -noout >/dev/null 2>&1 \
-            && ! openssl pkcs12 -in "$P12_PATH" -passin pass:"$CSC_KEY_PASSWORD" -noout -legacy >/dev/null 2>&1; then
-            echo "::error::CSC_KEY_PASSWORD does not unlock the .p12 in CSC_LINK (or CSC_LINK is not a valid .p12)."
-            echo "Re-export Developer ID Application from Keychain Access as .p12, then:"
-            echo "  base64 -i YourCert.p12 | tr -d '\\n' | pbcopy  → overwrite CSC_LINK"
-            echo "  exact export password → overwrite CSC_KEY_PASSWORD"
-            exit 1
-          fi
-          echo "Verified .p12 unlocks with CSC_KEY_PASSWORD ($(wc -c < "$P12_PATH" | tr -d ' ') bytes)"
-          # Pass a file path into electron-builder (more reliable than base64 env).
-          echo "CSC_LINK=$P12_PATH" >> "$GITHUB_ENV"
-
-          KEY_PATH="${RUNNER_TEMP}/AuthKey_${APPLE_API_KEY_ID}.p8"
-          if printf '%s' "$APPLE_API_KEY" | grep -q "BEGIN PRIVATE KEY"; then
-            printf '%s\n' "$APPLE_API_KEY" > "$KEY_PATH"
-          else
-            printf '%s' "$APPLE_API_KEY" | tr -d '\n\r\t ' | base64 --decode > "$KEY_PATH"
-          fi
-          chmod 600 "$KEY_PATH"
-          echo "APPLE_API_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
+        run: bash scripts/ci-mac-prepare-signing.sh
 
       - name: Build Mac installer (signed + notarized)
         if: matrix.platform == 'mac'
-        run: npm run build -- --mac --publish never
+        run: |
+          set -euo pipefail
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          npm run build -- --mac --publish never
         env:
-          # CSC_LINK is the prepared .p12 path from GITHUB_ENV (do not override with secret).
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          # Do not set CSC_LINK / CSC_KEY_PASSWORD — works around electron-builder #10066
+          # (set-key-partition-list gets the wrong password when using CSC_LINK on macOS 26).
+          CSC_IDENTITY_AUTO_DISCOVERY: true
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
