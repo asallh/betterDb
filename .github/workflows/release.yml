@@ -120,6 +120,9 @@ jobs:
           # Do not set CSC_LINK / CSC_KEY_PASSWORD — works around electron-builder #10066
           # (set-key-partition-list gets the wrong password when using CSC_LINK on macOS 26).
           CSC_IDENTITY_AUTO_DISCOVERY: true
+          # Release is triggered by a merged pull_request event; without this,
+          # electron-builder skips signing and notarization returns Invalid.
+          CSC_FOR_PULL_REQUEST: true
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}

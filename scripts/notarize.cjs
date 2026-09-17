@@ -7,7 +7,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 
-function run(command, args) {
+function run(command, args, { allowFail = false } = {}) {
   console.log(`$ ${command} ${args.join(" ")}`);
   const result = spawnSync(command, args, {
     encoding: "utf8",
@@ -15,12 +15,26 @@ function run(command, args) {
   });
   if (result.stdout?.trim()) console.log(result.stdout.trim());
   if (result.stderr?.trim()) console.error(result.stderr.trim());
-  if (result.status !== 0) {
+  if (!allowFail && result.status !== 0) {
     throw new Error(
       `${command} ${args.join(" ")} failed with exit ${result.status ?? "null"}`,
     );
   }
   return result;
+}
+
+function assertDeveloperIdSigned(appPath) {
+  const details = spawnSync("codesign", ["-dv", "--verbose=2", appPath], {
+    encoding: "utf8",
+  });
+  const output = `${details.stdout || ""}\n${details.stderr || ""}`;
+  console.log(output.trim());
+  if (/Signature=adhoc/i.test(output) || !/Authority=Developer ID Application/i.test(output)) {
+    throw new Error(
+      `Refusing to notarize ${appPath}: not Developer ID–signed (adhoc or missing identity). ` +
+        `If this is a pull_request-triggered Release build, set CSC_FOR_PULL_REQUEST=true.`,
+    );
+  }
 }
 
 /**
@@ -66,6 +80,8 @@ exports.default = async function notarizeMacApp(context) {
     appPath = path.join(appOutDir, apps[0]);
   }
 
+  assertDeveloperIdSigned(appPath);
+
   const zipPath = path.join(
     os.tmpdir(),
     `${path.basename(appPath, ".app")}-notarize.zip`,
@@ -94,15 +110,35 @@ exports.default = async function notarizeMacApp(context) {
   ]);
 
   let status = "Unknown";
+  let submissionId = "";
   try {
     const parsed = JSON.parse(submit.stdout || "{}");
     status = String(parsed.status || status);
+    submissionId = String(parsed.id || "");
   } catch {
     // keep Unknown
   }
   fs.rmSync(zipPath, { force: true });
 
   if (status !== "Accepted") {
+    if (submissionId) {
+      console.error(`Fetching notarytool log for submission ${submissionId}…`);
+      run(
+        "xcrun",
+        [
+          "notarytool",
+          "log",
+          submissionId,
+          "--key",
+          keyPath,
+          "--key-id",
+          keyId,
+          "--issuer",
+          issuer,
+        ],
+        { allowFail: true },
+      );
+    }
     throw new Error(
       `Notarization finished with status=${status} (expected Accepted)`,
     );
