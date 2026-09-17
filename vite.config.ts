@@ -49,6 +49,7 @@ export default defineConfig(({ command }) => {
                   'snowflake-sdk',
                   '@clickhouse/client',
                   '@google-cloud/bigquery',
+                  'electron-updater',
                 ],
               },
             },

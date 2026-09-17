@@ -172,6 +172,7 @@ jobs:
         run: |
           set -euo pipefail
           # Distinct appId + productName so Nightly installs beside production.
+          # Publish channel "nightly" → latest-*-nightly.yml for electron-updater.
           node <<'NODE'
             const fs = require("node:fs");
             const path = "electron-builder.json5";
@@ -188,6 +189,14 @@ jobs:
               text = text.replace(
                 /productName:\s*"BetterDB Nightly",/,
                 'productName: "BetterDB Nightly",\n  executableName: "BetterDB-Nightly",'
+              );
+            }
+            if (/channel:\s*"[^"]+"/.test(text)) {
+              text = text.replace(/channel:\s*"[^"]+"/, 'channel: "nightly"');
+            } else if (/publish:\s*\{/.test(text)) {
+              text = text.replace(
+                /publish:\s*\{/,
+                'publish: {\n    channel: "nightly",'
               );
             }
             fs.writeFileSync(path, text);
@@ -279,7 +288,7 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
-      - name: Stage installer only
+      - name: Stage installer and update metadata
         shell: bash
         run: |
           set -euo pipefail
@@ -293,13 +302,22 @@ jobs:
           do
             cp "$f" staged/
           done
-          count=$(find staged -type f | wc -l | tr -d ' ')
-          if [ "$count" -ne 1 ]; then
-            echo "::error::Expected exactly 1 installer for ${{ matrix.platform }}, found $count"
+          installer_count=$(find staged -type f \( -name '*.dmg' -o -name '*.exe' -o -name '*.AppImage' \) | wc -l | tr -d ' ')
+          if [ "$installer_count" -ne 1 ]; then
+            echo "::error::Expected exactly 1 installer for ${{ matrix.platform }}, found $installer_count"
             ls -la "release/${version}" || true
             ls -la staged || true
             exit 1
           fi
+          for f in \
+            "release/${version}"/*.yml \
+            "release/${version}"/*.blockmap \
+            "release/${version}"/BetterDB\ Nightly-*-Installer.zip
+          do
+            cp "$f" staged/
+          done
+          echo "Staged artifacts:"
+          ls -la staged
 
       - uses: actions/upload-artifact@v4
         with:
@@ -318,7 +336,7 @@ jobs:
           pattern: betterdb-${{ needs.gate.outputs.version }}-*
           merge-multiple: true
 
-      - name: Collect installers
+      - name: Collect installers and update metadata
         run: |
           set -euo pipefail
           mkdir -p installers
@@ -330,7 +348,7 @@ jobs:
           do
             cp "$f" installers/
           done
-          count=$(find installers -type f | wc -l | tr -d ' ')
+          count=$(find installers -type f \( -name '*.dmg' -o -name '*.exe' -o -name '*.AppImage' \) | wc -l | tr -d ' ')
           echo "Installer files:"
           ls -la installers
           if [ "$count" -ne 3 ]; then
@@ -339,6 +357,15 @@ jobs:
             find artifacts -type f | sort
             exit 1
           fi
+          for f in \
+            artifacts/*.yml \
+            artifacts/*.blockmap \
+            artifacts/BetterDB\ Nightly-*-Installer.zip
+          do
+            cp "$f" installers/
+          done
+          echo "Release upload set:"
+          ls -la installers
 
       - uses: softprops/action-gh-release@v2
         with:

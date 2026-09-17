@@ -1,25 +1,21 @@
 import { ipcMain, shell } from "electron";
 import { IPC } from "./channels";
-import type { UpdateGateDecision } from "../../shared/version";
+import {
+  getAppUpdateStatus,
+  installDownloadedUpdate,
+  releaseUrlForStatus,
+} from "../updater/autoUpdate";
 
-let currentDecision: UpdateGateDecision | null = null;
-
-export function setUpdateGateDecision(decision: UpdateGateDecision): void {
-  currentDecision = decision;
-}
-
-export function getUpdateGateDecision(): UpdateGateDecision | null {
-  return currentDecision;
-}
-
-/** Updater IPC only — safe to register even when DB handlers are withheld. */
+/** Updater IPC — always registered; never withholds DB handlers. */
 export function registerUpdaterIpcHandlers(): void {
-  ipcMain.handle(IPC.UPDATER_GET_STATUS, async () => currentDecision);
+  ipcMain.handle(IPC.UPDATER_GET_STATUS, async () => getAppUpdateStatus());
+
+  ipcMain.handle(IPC.UPDATER_INSTALL, async () => {
+    installDownloadedUpdate();
+  });
 
   ipcMain.handle(IPC.UPDATER_OPEN_RELEASE, async () => {
-    const url = currentDecision?.kind === "force" || currentDecision?.kind === "ok"
-      ? currentDecision.releaseUrl
-      : null;
+    const url = releaseUrlForStatus(getAppUpdateStatus());
     if (!url) {
       throw new Error("No release URL available");
     }

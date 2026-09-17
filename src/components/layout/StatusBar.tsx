@@ -1,13 +1,15 @@
+import { Info } from "lucide-react";
 import { useConnectionStore } from "@/stores/connectionStore";
 import { useQueryStore } from "@/stores/queryStore";
 import { DatabaseEngineIcon } from "@/components/icons/DatabaseIcons";
-import type { UpdateGateDecision } from "../../../shared/version";
+import { updater } from "@/lib/updater";
+import type { AppUpdateStatus } from "../../../shared/updateStatus";
 
 interface StatusBarProps {
-  updateGate?: UpdateGateDecision | null;
+  updateStatus?: AppUpdateStatus | null;
 }
 
-export function StatusBar({ updateGate }: StatusBarProps) {
+export function StatusBar({ updateStatus }: StatusBarProps) {
   const activeId = useConnectionStore((s) => s.activeConnectionId);
   const connections = useConnectionStore((s) => s.connections);
   const activeTabId = useQueryStore((s) => s.activeTabId);
@@ -16,7 +18,19 @@ export function StatusBar({ updateGate }: StatusBarProps) {
   const active = connections.find((c) => c.id === activeId);
   const activeTab = tabs.find((t) => t.id === activeTabId);
   const result = activeTab?.result;
-  const checkFailed = updateGate?.kind === "error";
+
+  async function onUpdateClick() {
+    if (updateStatus?.state !== "ready") return;
+    try {
+      await updater.install();
+    } catch {
+      try {
+        await updater.openRelease();
+      } catch {
+        // fail-open: leave the indicator visible
+      }
+    }
+  }
 
   return (
     <div className="app-drag glass flex items-center justify-between border-t px-3.5 py-1.5 text-[11px] tracking-[-0.01em] text-muted-foreground">
@@ -48,8 +62,34 @@ export function StatusBar({ updateGate }: StatusBarProps) {
             Disconnected
           </span>
         )}
-        {checkFailed && (
-          <span className="text-muted-foreground/80" title={updateGate.message}>
+        {updateStatus?.state === "downloading" && (
+          <span className="app-no-drag flex items-center gap-1 text-muted-foreground/90">
+            <Info className="h-3 w-3 shrink-0" strokeWidth={2} aria-hidden />
+            Downloading update… {updateStatus.percent}%
+          </span>
+        )}
+        {updateStatus?.state === "available" && (
+          <span className="app-no-drag flex items-center gap-1 text-muted-foreground/90">
+            <Info className="h-3 w-3 shrink-0" strokeWidth={2} aria-hidden />
+            Downloading update…
+          </span>
+        )}
+        {updateStatus?.state === "ready" && (
+          <button
+            type="button"
+            onClick={() => void onUpdateClick()}
+            className="app-no-drag inline-flex items-center gap-1 text-foreground/85 hover:text-foreground transition-colors"
+            title={`Restart to install ${updateStatus.remoteVersion}`}
+          >
+            <Info className="h-3 w-3 shrink-0" strokeWidth={2} aria-hidden />
+            Update available
+          </button>
+        )}
+        {updateStatus?.state === "error" && (
+          <span
+            className="app-no-drag text-muted-foreground/80"
+            title={updateStatus.message}
+          >
             Update check failed
           </span>
         )}

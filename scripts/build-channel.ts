@@ -128,7 +128,9 @@ function applyChannel(channel: BuildChannel): {
   const builder = read("electron-builder.json5").toString("utf8");
   write(
     "electron-builder.json5",
-    patchElectronBuilderConfig(builder, identity),
+    patchElectronBuilderConfig(builder, identity, {
+      updateChannel: channel === "nightly" ? "nightly" : "latest",
+    }),
   );
 
   return {

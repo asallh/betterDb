@@ -3,12 +3,12 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { ConnectionManager } from "./db/ConnectionManager";
 import { registerIpcHandlers } from "./ipc/handlers";
+import { registerUpdaterIpcHandlers } from "./ipc/updaterHandlers";
 import {
-  registerUpdaterIpcHandlers,
-  setUpdateGateDecision,
-} from "./ipc/updaterHandlers";
-import { checkLatestRelease } from "./updater/checkLatest";
-import { appDisplayNameForVersion, shouldBlockApp } from "../shared/version";
+  configureAutoUpdater,
+  startAutoUpdateCheck,
+} from "./updater/autoUpdate";
+import { appDisplayNameForVersion } from "../shared/version";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const connectionManager = new ConnectionManager();
@@ -96,19 +96,11 @@ app.on("activate", () => {
   }
 });
 
-app.whenReady().then(async () => {
+app.whenReady().then(() => {
   registerUpdaterIpcHandlers();
+  registerIpcHandlers(connectionManager);
 
-  const localVersion = app.getVersion();
-  const decision = await checkLatestRelease(localVersion);
-  setUpdateGateDecision(decision);
-
-  const blocked = shouldBlockApp(decision);
-
-  // Do not register DB IPC while the hard gate is active.
-  if (!blocked) {
-    registerIpcHandlers(connectionManager);
-  }
-
+  configureAutoUpdater({ getMainWindow: () => win });
   createWindow();
+  startAutoUpdateCheck();
 });
