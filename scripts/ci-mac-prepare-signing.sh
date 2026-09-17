@@ -78,6 +78,18 @@ if [ ! -s "$KEY_PATH" ]; then
   exit 1
 fi
 
+echo "Validating App Store Connect API key with notarytool…"
+if ! xcrun notarytool history \
+  --key "$KEY_PATH" \
+  --key-id "$APPLE_API_KEY_ID" \
+  --issuer "$APPLE_API_ISSUER" >/tmp/notary-history.txt 2>&1; then
+  echo "::error::notarytool rejected APPLE_API_KEY / APPLE_API_KEY_ID / APPLE_API_ISSUER"
+  echo "Check that APPLE_API_KEY_ID matches the Key ID for this .p8, and APPLE_API_ISSUER is the Team Issuer UUID (not your Team ID)."
+  sed 's/[^[:print:][:space:]]/?/g' /tmp/notary-history.txt | tail -40 || true
+  exit 1
+fi
+echo "notarytool credentials OK"
+
 {
   echo "APPLE_API_KEY_PATH=$KEY_PATH"
   echo "KEYCHAIN_PATH=$KEYCHAIN"
