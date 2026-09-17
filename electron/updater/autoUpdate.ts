@@ -1,11 +1,14 @@
 import { app, type BrowserWindow } from "electron";
-import { autoUpdater } from "electron-updater";
+// CJS package: named ESM import crashes when Vite externalizes it for Electron.
+import electronUpdater from "electron-updater";
 import {
   UPDATER_STATUS_EVENT,
   githubReleaseUrl,
   updaterChannelForVersion,
   type AppUpdateStatus,
 } from "../../shared/updateStatus";
+
+const { autoUpdater } = electronUpdater;
 
 export const GITHUB_REPO = "asallh/betterDb";
 

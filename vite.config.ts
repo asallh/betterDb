@@ -3,10 +3,12 @@ import path from 'node:path'
 import electron from 'vite-plugin-electron/simple'
 import react from '@vitejs/plugin-react'
 import pkg from './package.json'
+import { brandIconSrcForVersion } from './shared/version'
 
 // https://vitejs.dev/config/
 export default defineConfig(({ command }) => {
   const appChannel = command === 'serve' ? 'dev' : 'auto'
+  const faviconHref = brandIconSrcForVersion(pkg.version, appChannel)
 
   return {
     define: {
@@ -22,10 +24,10 @@ export default defineConfig(({ command }) => {
       {
         name: 'betterdb-channel-favicon',
         transformIndexHtml(html) {
-          if (appChannel !== 'dev') return html
+          if (faviconHref === './betterDB.png') return html
           return html.replace(
-            'href="/betterDB.png"',
-            'href="/betterDB-dev.png"'
+            'href="./betterDB.png"',
+            `href="${faviconHref}"`,
           )
         },
       },

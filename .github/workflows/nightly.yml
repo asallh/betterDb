@@ -199,6 +199,12 @@ jobs:
                 'publish: {\n    channel: "nightly",'
               );
             }
+            // Nightly: ship only the public Mac installer (dmg). Skip zip —
+            // zip is ~120MB and only needed for silent electron-updater OTA.
+            text = text.replace(
+              /target:\s*\["dmg",\s*"zip"\]/,
+              'target: ["dmg"]'
+            );
             fs.writeFileSync(path, text);
             console.log(fs.readFileSync(path, "utf8"));
           NODE
@@ -288,13 +294,15 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
-      - name: Stage installer and update metadata
+      - name: Stage installer
         shell: bash
         run: |
           set -euo pipefail
           version="${{ needs.gate.outputs.version }}"
           mkdir -p staged
           shopt -s nullglob
+          # Minimal nightly upload: one public installer per platform.
+          # Skip zip / yml / blockmap / builder-debug (OTA feeds stay on Release).
           for f in \
             "release/${version}"/BetterDB\ Nightly-*-Installer.dmg \
             "release/${version}"/BetterDB\ Nightly-*-Setup.exe \
@@ -309,13 +317,6 @@ jobs:
             ls -la staged || true
             exit 1
           fi
-          for f in \
-            "release/${version}"/*.yml \
-            "release/${version}"/*.blockmap \
-            "release/${version}"/BetterDB\ Nightly-*-Installer.zip
-          do
-            cp "$f" staged/
-          done
           echo "Staged artifacts:"
           ls -la staged
 
@@ -336,7 +337,7 @@ jobs:
           pattern: betterdb-${{ needs.gate.outputs.version }}-*
           merge-multiple: true
 
-      - name: Collect installers and update metadata
+      - name: Collect installers
         run: |
           set -euo pipefail
           mkdir -p installers
@@ -349,7 +350,7 @@ jobs:
             cp "$f" installers/
           done
           count=$(find installers -type f \( -name '*.dmg' -o -name '*.exe' -o -name '*.AppImage' \) | wc -l | tr -d ' ')
-          echo "Installer files:"
+          echo "Release upload set (installers only):"
           ls -la installers
           if [ "$count" -ne 3 ]; then
             echo "::error::Expected exactly 3 installers (mac/win/linux), found $count"
@@ -357,15 +358,6 @@ jobs:
             find artifacts -type f | sort
             exit 1
           fi
-          for f in \
-            artifacts/*.yml \
-            artifacts/*.blockmap \
-            artifacts/BetterDB\ Nightly-*-Installer.zip
-          do
-            cp "$f" installers/
-          done
-          echo "Release upload set:"
-          ls -la installers
 
       - uses: softprops/action-gh-release@v2
         with:
