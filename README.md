@@ -171,7 +171,9 @@ Mac Nightly and Release jobs **fail closed** unless these GitHub Actions secrets
 Setup outline:
 
 1. Enroll in the [Apple Developer Program](https://developer.apple.com/programs/).
-2. Create a **Developer ID Application** certificate in Xcode / developer.apple.com, export it as `.p12`, then: `base64 -i YourCert.p12 | pbcopy` → paste into `CSC_LINK`.
+2. Create a **Developer ID Application** certificate in Xcode / developer.apple.com, export it as `.p12`, then:
+   `base64 -i YourCert.p12 | tr -d '\n' | pbcopy` → paste into `CSC_LINK` (must be the `.p12`, not the `.cer`).
+   Put the exact export password in `CSC_KEY_PASSWORD`.
 3. In [App Store Connect → Users and Access → Integrations → Team Keys](https://appstoreconnect.apple.com/access/integrations/api), create a Team API key with App Manager access. Download `AuthKey_<KEYID>.p8` once; store Key ID, Issuer ID, and the `.p8` contents (or `base64 -i AuthKey_….p8`) as the secrets above.
 
 Local `npm run build:nightly` / `npm run build:prod` stay **unsigned** on purpose. If Gatekeeper blocks a copied local `.app`:
