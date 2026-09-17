@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   compareVersions,
   appDisplayNameForVersion,
+  brandIconSrcForVersion,
   isNightlyVersion,
   isVersionBehind,
   normalizeVersion,
@@ -76,6 +77,21 @@ describe("appDisplayNameForVersion", () => {
     );
     expect(appDisplayNameForVersion("0.1.0-beta.1")).toBe("BetterDB");
     expect(appDisplayNameForVersion("1.0.0")).toBe("BetterDB");
+  });
+});
+
+describe("brandIconSrcForVersion", () => {
+  it("picks channel PNGs for dev and nightly", () => {
+    expect(brandIconSrcForVersion("0.1.0", "dev")).toBe("./betterDB-dev.png");
+    expect(
+      brandIconSrcForVersion("0.1.0-nightly.20250916.abc1234", "auto"),
+    ).toBe("./betterDB-nightly.png");
+  });
+
+  it("keeps prod mark for stable and labeled prereleases", () => {
+    expect(brandIconSrcForVersion("1.0.0")).toBe("./betterDB.png");
+    expect(brandIconSrcForVersion("0.1.0-beta.1")).toBe("./betterDB.png");
+    expect(brandIconSrcForVersion("0.1.0-rc.1", "auto")).toBe("./betterDB.png");
   });
 });
 
