@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   compareVersions,
-  decideUpdateGate,
   appDisplayNameForVersion,
   isNightlyVersion,
   isVersionBehind,
@@ -10,7 +9,6 @@ import {
   parseVersion,
   pickNewestRelease,
   resolveVersionInfo,
-  shouldBlockApp,
   updateChannelForVersion,
 } from "./version";
 
@@ -181,52 +179,5 @@ describe("pickNewestRelease", () => {
         { channel: "nightly" }
       )
     ).toBeNull();
-  });
-});
-
-describe("decideUpdateGate", () => {
-  it("forces when local is behind remote", () => {
-    const decision = decideUpdateGate("0.1.0-beta.1", {
-      version: "v0.1.0-beta.2",
-      htmlUrl: "https://github.com/asallh/betterDb/releases/tag/v0.1.0-beta.2",
-    });
-    expect(decision).toEqual({
-      kind: "force",
-      localVersion: "0.1.0-beta.1",
-      remoteVersion: "0.1.0-beta.2",
-      releaseUrl:
-        "https://github.com/asallh/betterDb/releases/tag/v0.1.0-beta.2",
-    });
-    expect(shouldBlockApp(decision)).toBe(true);
-  });
-
-  it("ok when local matches or is ahead", () => {
-    const same = decideUpdateGate("0.1.0-beta.2", {
-      version: "0.1.0-beta.2",
-      htmlUrl: "https://example.com/r",
-    });
-    expect(same.kind).toBe("ok");
-    expect(shouldBlockApp(same)).toBe(false);
-
-    const ahead = decideUpdateGate("0.2.0", {
-      version: "0.1.0-beta.2",
-      htmlUrl: "https://example.com/r",
-    });
-    expect(ahead.kind).toBe("ok");
-  });
-
-  it("errors (fail-open) on network failure", () => {
-    const decision = decideUpdateGate("0.1.0-beta.1", null, {
-      reason: "network",
-      message: "fetch failed",
-    });
-    expect(decision.kind).toBe("error");
-    expect(shouldBlockApp(decision)).toBe(false);
-  });
-
-  it("errors when no releases", () => {
-    const decision = decideUpdateGate("0.1.0-beta.1", null);
-    expect(decision).toMatchObject({ kind: "error", reason: "empty" });
-    expect(shouldBlockApp(decision)).toBe(false);
   });
 });

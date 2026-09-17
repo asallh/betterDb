@@ -7,15 +7,12 @@ import { MainArea } from "@/components/layout/MainArea";
 import { StatusBar } from "@/components/layout/StatusBar";
 import { TitleBar } from "@/components/layout/TitleBar";
 import { WelcomeScreen } from "@/components/layout/WelcomeScreen";
-import { ForceUpdateScreen } from "@/components/layout/ForceUpdateScreen";
 import { ConnectionFormModal } from "@/components/connections/ConnectionFormModal";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { applyStageTheme } from "@/lib/stageTheme";
 import { updater } from "@/lib/updater";
-import {
-  resolveVersionInfo,
-  type UpdateGateDecision,
-} from "../shared/version";
+import { resolveVersionInfo } from "../shared/version";
+import type { AppUpdateStatus } from "../shared/updateStatus";
 
 export default function App() {
   const activeConnectionId = useConnectionStore((s) => s.activeConnectionId);
@@ -25,8 +22,8 @@ export default function App() {
   const editingConnectionId = useUiStore((s) => s.editingConnectionId);
   const closeConnectionForm = useUiStore((s) => s.closeConnectionForm);
 
-  const [gate, setGate] = useState<UpdateGateDecision | null | undefined>(
-    undefined
+  const [updateStatus, setUpdateStatus] = useState<AppUpdateStatus | null>(
+    null
   );
 
   useEffect(() => {
@@ -49,21 +46,23 @@ export default function App() {
     updater
       .getStatus()
       .then((status) => {
-        if (!cancelled) setGate(status);
+        if (!cancelled) setUpdateStatus(status);
       })
       .catch(() => {
-        if (!cancelled) setGate(null);
+        if (!cancelled) setUpdateStatus(null);
       });
+    const unsubscribe = updater.onStatus((status) => {
+      if (!cancelled) setUpdateStatus(status);
+    });
     return () => {
       cancelled = true;
+      unsubscribe();
     };
   }, []);
 
   useEffect(() => {
-    if (gate?.kind === "force") return;
-    if (gate === undefined) return;
     loadConnections();
-  }, [gate, loadConnections]);
+  }, [loadConnections]);
 
   useEffect(() => {
     if (!activeConnectionId) {
@@ -73,18 +72,6 @@ export default function App() {
 
   useKeyboardShortcuts();
 
-  if (gate === undefined) {
-    return (
-      <div className="app-shell flex h-screen items-center justify-center text-sm text-muted-foreground">
-        Checking for updates…
-      </div>
-    );
-  }
-
-  if (gate?.kind === "force") {
-    return <ForceUpdateScreen decision={gate} />;
-  }
-
   return (
     <div className="app-shell flex h-screen flex-col">
       <TitleBar />
@@ -92,7 +79,7 @@ export default function App() {
         <Sidebar />
         {activeConnectionId ? <MainArea /> : <WelcomeScreen />}
       </div>
-      <StatusBar updateGate={gate} />
+      <StatusBar updateStatus={updateStatus} />
       {connectionFormOpen && (
         <ConnectionFormModal
           connectionId={editingConnectionId}

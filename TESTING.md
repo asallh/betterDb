@@ -32,16 +32,17 @@ npm run test:watch
 - When fixing a bug, add a regression test
 - When adding a conditional, cover both branches
 
-## OTA hard gate (manual QA)
+## Soft in-app OTA (manual QA)
 
-Version check compares `app.getVersion()` to the newest non-draft GitHub Release for `asallh/betterDb` (prereleases included). Fail-open on network/timeout errors.
+Packaged builds use `electron-updater` against GitHub Releases (channel-aware: nightlies only see nightlies). The app never hard-blocks; updates download in the background and surface in the status bar.
 
 Checklist:
 
-- [ ] Packaged build whose version is **behind** the latest GitHub tag shows the force-update screen (no sidebar / DB UI)
-- [ ] **Open download** / **View release notes** opens the release URL in the browser
-- [ ] Packaged build whose version **matches** (or is ahead of) latest opens the normal app
+- [ ] Packaged build whose version is **behind** the latest feed still opens the normal app (sidebar / DB UI available)
+- [ ] Status bar shows download progress, then **Update available** (Info icon); click restarts and installs
+- [ ] Packaged build whose version **matches** (or is ahead of) latest shows no update indicator
 - [ ] With network blocked / GitHub unreachable, the app still opens (fail-open) and the status bar can show “Update check failed”
-- [ ] Confirm DB IPC is unavailable while the force-update screen is showing (connections cannot load)
+- [ ] Release assets include platform installers **plus** `latest*.yml` / blockmaps (and Mac zip for silent OTA)
+- [ ] Nightly install only offers newer nightlies; production/prerelease ignores nightly tags
 
-Release note reminder: only builds that ship this checker can be forced; pre-gate installers are unaffected until users manually upgrade once.
+Local Vite/Electron serve skips auto-update (`app.isPackaged` is false).

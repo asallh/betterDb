@@ -9,11 +9,16 @@
     output: "release/${version}",
   },
   files: ["dist", "dist-electron"],
-  publish: null,
+  publish: {
+    provider: "github",
+    owner: "asallh",
+    repo: "betterDb",
+  },
   afterSign: "scripts/notarize.cjs",
   mac: {
     icon: "build/betterDB.icns",
-    target: ["dmg"],
+    // zip feeds electron-updater; dmg remains the public installer.
+    target: ["dmg", "zip"],
     artifactName: "${productName}-Mac-${version}-Installer.${ext}",
     hardenedRuntime: true,
     gatekeeperAssess: false,
