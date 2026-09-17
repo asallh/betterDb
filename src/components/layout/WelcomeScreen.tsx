@@ -7,7 +7,7 @@ export function WelcomeScreen() {
   return (
     <div className="relative flex flex-1 items-center justify-center overflow-hidden px-6">
       <div className="relative flex w-full max-w-[22rem] flex-col items-center text-center animate-in fade-in zoom-in-95 duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]">
-        <div className="flex h-14 w-14 items-center justify-center rounded-[1.05rem] border border-primary/25 bg-primary/[0.1] shadow-[0_0_36px_hsl(var(--primary)/0.28),inset_0_1px_0_0_hsl(0_0%_100%/0.1)]">
+        <div className="flex h-14 w-14 items-center justify-center rounded-[1.05rem] border border-[hsl(var(--glow)/0.25)] bg-[hsl(var(--glow)/0.1)] shadow-[0_0_36px_hsl(var(--glow)/0.28),inset_0_1px_0_0_hsl(0_0%_100%/0.1)]">
           <Database className="h-7 w-7 text-primary" strokeWidth={1.5} aria-hidden />
         </div>
 

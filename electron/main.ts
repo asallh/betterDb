@@ -8,10 +8,16 @@ import {
   setUpdateGateDecision,
 } from "./ipc/updaterHandlers";
 import { checkLatestRelease } from "./updater/checkLatest";
-import { shouldBlockApp } from "../shared/version";
+import { appDisplayNameForVersion, shouldBlockApp } from "../shared/version";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const connectionManager = new ConnectionManager();
+const APP_DISPLAY_NAME = appDisplayNameForVersion(app.getVersion());
+
+// Separate name → separate userData, so Nightly can run beside production.
+if (APP_DISPLAY_NAME !== "BetterDB") {
+  app.setName(APP_DISPLAY_NAME);
+}
 
 // The built directory structure
 //
@@ -48,7 +54,7 @@ function createWindow() {
     height: 800,
     minWidth: 800,
     minHeight: 500,
-    title: "BetterDB",
+    title: APP_DISPLAY_NAME,
     titleBarStyle: isMac ? "hiddenInset" : "default",
     ...(isMac ? { trafficLightPosition: { x: 12, y: 8 } } : {}),
     ...(windowIcon && !isMac ? { icon: windowIcon } : {}),
