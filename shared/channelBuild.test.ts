@@ -31,10 +31,27 @@ describe("patchElectronBuilderConfig", () => {
     const patched = patchElectronBuilderConfig(
       sample,
       CHANNEL_IDENTITIES.nightly,
+      { updateChannel: "nightly" },
     );
     expect(patched).toContain('appId: "com.betterdb.app.nightly"');
     expect(patched).toContain('productName: "BetterDB Nightly"');
     expect(patched).toContain('executableName: "BetterDB-Nightly"');
+  });
+
+  it("sets the nightly publish channel when provided", () => {
+    const withPublish = `${sample.slice(0, -1)},
+  publish: {
+    provider: "github",
+    owner: "asallh",
+    repo: "betterDb",
+  },
+}`;
+    const patched = patchElectronBuilderConfig(
+      withPublish,
+      CHANNEL_IDENTITIES.nightly,
+      { updateChannel: "nightly" },
+    );
+    expect(patched).toContain('channel: "nightly"');
   });
 
   it("updates an existing executableName", () => {

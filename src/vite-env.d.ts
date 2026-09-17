@@ -7,4 +7,9 @@ interface Window {
   env?: {
     platform: string;
   };
+  ipcRenderer: {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    invoke(channel: string, ...args: any[]): Promise<any>;
+    on(channel: string, listener: (...args: unknown[]) => void): () => void;
+  };
 }

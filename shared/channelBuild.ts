@@ -35,7 +35,8 @@ export function makeNightlyVersion(
 /** Patch electron-builder.json5 identity fields for a channel. */
 export function patchElectronBuilderConfig(
   source: string,
-  identity: ChannelIdentity
+  identity: ChannelIdentity,
+  options: { updateChannel?: "latest" | "nightly" } = {}
 ): string {
   let text = source.replace(/appId:\s*"[^"]+"/, `appId: "${identity.appId}"`);
   text = text.replace(
@@ -53,6 +54,19 @@ export function patchElectronBuilderConfig(
       `productName: "${identity.productName}",\n  executableName: "${identity.executableName}",`
     );
   }
+
+  const updateChannel = options.updateChannel;
+  if (updateChannel) {
+    if (/channel:\s*"[^"]+"/.test(text)) {
+      text = text.replace(/channel:\s*"[^"]+"/, `channel: "${updateChannel}"`);
+    } else if (/publish:\s*\{/.test(text)) {
+      text = text.replace(
+        /publish:\s*\{/,
+        `publish: {\n    channel: "${updateChannel}",`
+      );
+    }
+  }
+
   return text;
 }
 
