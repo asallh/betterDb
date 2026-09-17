@@ -205,6 +205,10 @@ jobs:
     needs: [gate, build]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
@@ -251,6 +255,7 @@ jobs:
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
           VERSION: ${{ needs.gate.outputs.version }}
           PRERELEASE: ${{ needs.gate.outputs.prerelease }}
         run: |
@@ -261,7 +266,7 @@ jobs:
           if gh release view "$tag" >/dev/null 2>&1; then
             echo "Release $tag already exists; will clobber assets on upload"
           else
-            create_args=(--target "$sha" --title "BetterDB ${tag}" --generate-notes)
+            create_args=(--repo "$GH_REPO" --target "$sha" --title "BetterDB ${tag}" --generate-notes)
             if [ "$PRERELEASE" = "true" ]; then
               create_args+=(--prerelease)
             else
@@ -282,7 +287,7 @@ jobs:
             ok=0
             for attempt in 1 2 3 4 5; do
               echo "Uploading ${name} (attempt ${attempt}/5)..."
-              if gh release upload "$tag" "$f" --clobber; then
+              if gh release upload "$tag" "$f" --repo "$GH_REPO" --clobber; then
                 ok=1
                 break
               fi
@@ -296,4 +301,4 @@ jobs:
           done
 
           echo "Published ${tag} with ${#files[@]} assets:"
-          gh release view "$tag" --json assets --jq '[.assets[].name] | sort | .[]'
+          gh release view "$tag" --repo "$GH_REPO" --json assets --jq '[.assets[].name] | sort | .[]'
