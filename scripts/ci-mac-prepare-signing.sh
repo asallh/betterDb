@@ -9,6 +9,7 @@ set -euo pipefail
 : "${CSC_KEY_PASSWORD:?CSC_KEY_PASSWORD is required}"
 : "${APPLE_API_KEY:?APPLE_API_KEY is required}"
 : "${APPLE_API_KEY_ID:?APPLE_API_KEY_ID is required}"
+: "${APPLE_API_ISSUER:?APPLE_API_ISSUER is required}"
 : "${RUNNER_TEMP:?RUNNER_TEMP is required}"
 : "${GITHUB_ENV:?GITHUB_ENV is required}"
 
