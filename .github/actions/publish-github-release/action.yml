@@ -9,11 +9,11 @@ inputs:
     description: Commit SHA to attach the tag to
     required: true
   prerelease:
-    description: "true" to mark as prerelease
+    description: Set to true to mark as prerelease
     required: false
     default: "false"
   make_latest:
-    description: "true" to set as latest release (ignored when prerelease=true)
+    description: Set to true to mark as the latest release (ignored when prerelease is true)
     required: false
     default: "true"
   release_name:
@@ -23,7 +23,7 @@ inputs:
     description: Directory of files to upload
     required: true
   min_installers:
-    description: Required number of .dmg/.exe/.AppImage files
+    description: Required number of dmg/exe/AppImage files
     required: false
     default: "3"
   allow_incomplete_clobber:

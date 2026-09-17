@@ -55,13 +55,14 @@ jobs:
 
           if [ "$semver_total" -ne 1 ]; then
             marker='<!-- release-pr-bot -->'
-            body="### Release checklist
-
-- **Status:** waiting for exactly one semver label: \`release:patch\`, \`release:minor\`, or \`release:major\`
-- Optional stage label: \`release:alpha\` | \`release:beta\` | \`release:rc\`
-- Add a label to continue — this check will re-run automatically
-
-${marker}"
+            body=$(printf '%s\n' \
+              '### Release checklist' \
+              '' \
+              '- **Status:** waiting for exactly one semver label: `release:patch`, `release:minor`, or `release:major`' \
+              '- Optional stage label: `release:alpha` | `release:beta` | `release:rc`' \
+              '- Add a label to continue — this check will re-run automatically' \
+              '' \
+              "${marker}")
             # Soft-fail UX: post/update comment, then fail so merge stays blocked (no version push).
             existing_id=$(gh api "repos/${GH_REPO}/issues/${PR_NUMBER}/comments" \
               --jq ".[] | select(.body | contains(\"${marker}\")) | .id" | head -1 || true)
