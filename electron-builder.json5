@@ -19,6 +19,9 @@
     gatekeeperAssess: false,
     entitlements: "build/entitlements.mac.plist",
     entitlementsInherit: "build/entitlements.mac.plist",
+    // Notarization is handled by afterSign (scripts/notarize.cjs).
+    // Avoid electron-builder auto-notarize when only APPLE_API_KEY_ID/ISSUER are set.
+    notarize: false,
   },
   win: {
     icon: "build/betterDB.ico",
