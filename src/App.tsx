@@ -10,8 +10,12 @@ import { WelcomeScreen } from "@/components/layout/WelcomeScreen";
 import { ForceUpdateScreen } from "@/components/layout/ForceUpdateScreen";
 import { ConnectionFormModal } from "@/components/connections/ConnectionFormModal";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
+import { applyStageTheme } from "@/lib/stageTheme";
 import { updater } from "@/lib/updater";
-import type { UpdateGateDecision } from "../shared/version";
+import {
+  resolveVersionInfo,
+  type UpdateGateDecision,
+} from "../shared/version";
 
 export default function App() {
   const activeConnectionId = useConnectionStore((s) => s.activeConnectionId);
@@ -24,6 +28,11 @@ export default function App() {
   const [gate, setGate] = useState<UpdateGateDecision | null | undefined>(
     undefined
   );
+
+  useEffect(() => {
+    const { stage } = resolveVersionInfo(__APP_VERSION__, __APP_CHANNEL__);
+    applyStageTheme(stage);
+  }, []);
 
   useEffect(() => {
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
