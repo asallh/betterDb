@@ -1,0 +1,122 @@
+name: Publish GitHub Release
+description: Create or update a GitHub Release and upload assets sequentially with retries.
+
+inputs:
+  version:
+    description: Semver without leading v (tag will be v${version})
+    required: true
+  target_sha:
+    description: Commit SHA to attach the tag to
+    required: true
+  prerelease:
+    description: Set to true to mark as prerelease
+    required: false
+    default: "false"
+  make_latest:
+    description: Set to true to mark as the latest release (ignored when prerelease is true)
+    required: false
+    default: "true"
+  release_name:
+    description: Display name for the release
+    required: true
+  files_dir:
+    description: Directory of files to upload
+    required: true
+  min_installers:
+    description: Required number of dmg/exe/AppImage files
+    required: false
+    default: "3"
+  allow_incomplete_clobber:
+    description: If release exists with fewer installers than min, allow re-upload
+    required: false
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - name: Collect and publish release assets
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        GH_REPO: ${{ github.repository }}
+        VERSION: ${{ inputs.version }}
+        TARGET_SHA: ${{ inputs.target_sha }}
+        PRERELEASE: ${{ inputs.prerelease }}
+        MAKE_LATEST: ${{ inputs.make_latest }}
+        RELEASE_NAME: ${{ inputs.release_name }}
+        FILES_DIR: ${{ inputs.files_dir }}
+        MIN_INSTALLERS: ${{ inputs.min_installers }}
+        ALLOW_INCOMPLETE_CLOBBER: ${{ inputs.allow_incomplete_clobber }}
+      run: |
+        set -euo pipefail
+        tag="v${VERSION}"
+
+        shopt -s nullglob
+        files=("$FILES_DIR"/*)
+        if [ "${#files[@]}" -eq 0 ]; then
+          echo "::error::No files to upload under $FILES_DIR"
+          exit 1
+        fi
+
+        installer_count=0
+        for f in "${files[@]}"; do
+          case "$f" in
+            *.dmg|*.exe|*.AppImage) installer_count=$((installer_count + 1)) ;;
+          esac
+        done
+        if [ "$installer_count" -lt "$MIN_INSTALLERS" ]; then
+          echo "::error::Expected at least $MIN_INSTALLERS installers, found $installer_count"
+          ls -la "$FILES_DIR" || true
+          exit 1
+        fi
+
+        if gh release view "$tag" --repo "$GH_REPO" >/dev/null 2>&1; then
+          existing=$(gh release view "$tag" --repo "$GH_REPO" --json assets \
+            --jq '[.assets[].name] | map(select(test("\\.(dmg|exe|AppImage)$"))) | length')
+          echo "Release $tag already exists with $existing installer asset(s)"
+          if [ "$existing" -ge "$MIN_INSTALLERS" ] && [ "$ALLOW_INCOMPLETE_CLOBBER" = "true" ]; then
+            # Still allow clobber of individual files (re-run safety), but log completeness.
+            echo "Existing release looks complete; will clobber assets on upload"
+          elif [ "$existing" -ge "$MIN_INSTALLERS" ]; then
+            echo "::error::Complete release $tag already exists"
+            exit 1
+          else
+            echo "Incomplete release detected; will create/upload with --clobber"
+          fi
+        else
+          create_args=(--repo "$GH_REPO" --target "$TARGET_SHA" --title "$RELEASE_NAME" --generate-notes)
+          if [ "$PRERELEASE" = "true" ]; then
+            create_args+=(--prerelease)
+          elif [ "$MAKE_LATEST" = "true" ]; then
+            create_args+=(--latest)
+          fi
+          gh release create "$tag" "${create_args[@]}"
+        fi
+
+        for f in "${files[@]}"; do
+          name=$(basename "$f")
+          ok=0
+          for attempt in 1 2 3 4 5; do
+            echo "Uploading ${name} (attempt ${attempt}/5)..."
+            if gh release upload "$tag" "$f" --repo "$GH_REPO" --clobber; then
+              ok=1
+              break
+            fi
+            echo "Upload failed for ${name}; sleeping before retry..."
+            sleep $((attempt * 15))
+          done
+          if [ "$ok" -ne 1 ]; then
+            echo "::error::Failed to upload ${name} after 5 attempts"
+            exit 1
+          fi
+        done
+
+        echo "Published ${tag} assets:"
+        gh release view "$tag" --repo "$GH_REPO" --json assets --jq '[.assets[].name] | sort | .[]'
+
+        final_count=$(gh release view "$tag" --repo "$GH_REPO" --json assets \
+          --jq '[.assets[].name] | map(select(test("\\.(dmg|exe|AppImage)$"))) | length')
+        if [ "$final_count" -lt "$MIN_INSTALLERS" ]; then
+          echo "::error::After upload, expected >= $MIN_INSTALLERS installers, found $final_count"
+          exit 1
+        fi

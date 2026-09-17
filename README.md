@@ -149,9 +149,9 @@ Releases follow [semver](https://semver.org/) via labels on a `dev` → `main` p
    - `release:minor` — new features (backward compatible)
    - `release:major` — breaking changes
 4. Optionally add one stage label: `release:alpha`, `release:beta`, or `release:rc`. Omit for a stable release.
-5. The **Release PR** workflow bumps `package.json` on `dev` and posts a checklist comment.
+5. The **Release PR** workflow bumps `package.json` on `dev` and posts a checklist comment. Missing labels fail the check (with a bot comment) and do not push.
 6. Update [CHANGELOG.md](CHANGELOG.md) with user-facing notes, wait for CI green, then merge.
-7. The **Release** workflow builds macOS / Windows / Linux installers and publishes them to [GitHub Releases](https://github.com/asallh/betterDb/releases).
+7. The merge pushes to `main` and the **Release** workflow builds macOS / Windows / Linux installers (Mac is Developer ID–signed and notarized), then publishes them to [GitHub Releases](https://github.com/asallh/betterDb/releases) with sequential asset uploads. Incomplete releases can be repaired; complete ones are skipped unless you re-run with `workflow_dispatch` + `force`.
 
 Use `release:skip` only when the `dev` → `main` PR must not cut a version (rare).
 
@@ -186,7 +186,7 @@ xattr -cr "/Applications/BetterDB-Nightly.app"   # or BetterDB.app for prod
 
 ### Nightly builds
 
-The **Nightly** workflow (`.github/workflows/nightly.yml`) runs daily at 06:00 UTC (and on manual `workflow_dispatch`) from `dev`:
+The **Nightly** workflow (`.github/workflows/nightly.yml`) runs daily at 06:00 UTC (and on manual `workflow_dispatch`) from `dev`. The workflow file itself lives on the default branch (`main`), so keep it in sync via normal merges:
 
 1. Skips successfully when `dev` HEAD matches the commit of the latest `v*-nightly*` tag.
 2. Otherwise sets an ephemeral version `{base}-nightly.{YYYYMMDD}.{shortsha}` (does not push to `dev`).

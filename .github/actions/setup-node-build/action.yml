@@ -1,0 +1,30 @@
+name: Setup Node and verify
+description: npm ci, rebuild native modules, lint, test, and typecheck.
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 20
+        cache: npm
+
+    - name: Install dependencies
+      shell: bash
+      run: npm ci
+
+    - name: Rebuild native modules for Electron
+      shell: bash
+      run: npx --yes @electron/rebuild -f -w better-sqlite3
+
+    - name: Lint
+      shell: bash
+      run: npm run lint
+
+    - name: Test
+      shell: bash
+      run: npm test
+
+    - name: Typecheck
+      shell: bash
+      run: npx tsc --noEmit

@@ -1,0 +1,94 @@
+name: Stage installers
+description: Stage exactly one platform installer (and optional OTA metadata) into staged/.
+
+inputs:
+  version:
+    description: release/${version} output directory version
+    required: true
+  platform:
+    description: mac | win | linux
+    required: true
+  include_ota:
+    description: Also stage yml/blockmap/Mac zip for electron-updater
+    required: false
+    default: "false"
+  staged_dir:
+    description: Destination directory
+    required: false
+    default: staged
+
+runs:
+  using: composite
+  steps:
+    - name: Stage installer and optional update metadata
+      shell: bash
+      run: |
+        set -euo pipefail
+        version="${{ inputs.version }}"
+        platform="${{ inputs.platform }}"
+        include_ota="${{ inputs.include_ota }}"
+        staged="${{ inputs.staged_dir }}"
+        out="release/${version}"
+
+        mkdir -p "$staged"
+        shopt -s nullglob
+
+        case "$platform" in
+          mac)
+            candidates=("$out"/*.dmg)
+            ;;
+          win)
+            candidates=("$out"/*.exe)
+            ;;
+          linux)
+            candidates=("$out"/*.AppImage)
+            ;;
+          *)
+            echo "::error::Unknown platform: $platform"
+            exit 1
+            ;;
+        esac
+
+        # Prefer named installers; fall back to any matching extension.
+        installer=""
+        for f in "${candidates[@]}"; do
+          base=$(basename "$f")
+          case "$base" in
+            *Installer.dmg|*Setup.exe|*.AppImage)
+              installer="$f"
+              break
+              ;;
+          esac
+        done
+        if [ -z "$installer" ] && [ "${#candidates[@]}" -gt 0 ]; then
+          installer="${candidates[0]}"
+        fi
+
+        if [ -z "$installer" ]; then
+          echo "::error::No installer found for platform=$platform under $out"
+          ls -la "$out" || true
+          exit 1
+        fi
+
+        cp "$installer" "$staged/"
+
+        installer_count=$(find "$staged" -type f \( -name '*.dmg' -o -name '*.exe' -o -name '*.AppImage' \) | wc -l | tr -d ' ')
+        if [ "$installer_count" -ne 1 ]; then
+          echo "::error::Expected exactly 1 installer for $platform, found $installer_count"
+          ls -la "$staged" || true
+          exit 1
+        fi
+
+        if [ "$include_ota" = "true" ]; then
+          for f in "$out"/*.yml "$out"/*.blockmap "$out"/*.zip; do
+            [ -e "$f" ] || continue
+            base=$(basename "$f")
+            if [ "$base" = "builder-debug.yml" ]; then
+              continue
+            fi
+            cp "$f" "$staged/"
+          done
+        fi
+
+        echo "Staged artifacts:"
+        ls -la "$staged"

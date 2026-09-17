@@ -20,9 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Replaced the launch-time hard update gate (blocking “Update required” screen + withheld DB IPC) with soft status-bar OTA.
 - Release uploads now include electron-updater metadata (`latest*.yml`, blockmaps) and a Mac zip alongside the three public installers (dmg / exe / AppImage).
-- Hardened the release pipeline so GitHub Releases always publish the three platform installers (plus update feed files).
+- Reworked release CI for reliability: shared composite actions for Mac signing/verify, installer staging, and sequential `gh` asset uploads with retries; **Release** now runs on push to `main` from a merged `dev` → `main` PR (with `workflow_dispatch` recovery); Nightly drops softprops parallel uploads; incomplete releases can be repaired; Mac builds require `stapler validate` after notarization.
 - Nightly packages install as **BetterDB Nightly** (`com.betterdb.app.nightly`) with a separate user-data directory so they can run beside production.
-- macOS Nightly and Release CI now **Developer ID–sign and notarize** DMGs (fails closed if signing secrets are missing) so Chrome downloads no longer show Gatekeeper’s “damaged” dialog. Signing uses a temporary keychain import to work around electron-builder’s CSC_LINK bug on macOS 26 runners. Release sets `CSC_FOR_PULL_REQUEST=true` because the workflow is triggered by a merged PR event.
+- macOS Nightly and Release CI **Developer ID–sign and notarize** DMGs (fails closed if signing secrets are missing) so Chrome downloads no longer show Gatekeeper’s “damaged” dialog. Signing uses a temporary keychain import to work around electron-builder’s CSC_LINK bug on macOS 26 runners.
 
 ## [0.1.0-beta.1] - 2026-06-24
 

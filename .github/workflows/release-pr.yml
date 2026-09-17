@@ -11,7 +11,7 @@ permissions:
 
 concurrency:
   group: release-bump-${{ github.event.pull_request.number }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   validate:
@@ -30,6 +30,9 @@ jobs:
         id: bump
         env:
           LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
 
@@ -51,6 +54,23 @@ jobs:
           stage_total=$((has_alpha + has_beta + has_rc))
 
           if [ "$semver_total" -ne 1 ]; then
+            marker='<!-- release-pr-bot -->'
+            body=$(printf '%s\n' \
+              '### Release checklist' \
+              '' \
+              '- **Status:** waiting for exactly one semver label: `release:patch`, `release:minor`, or `release:major`' \
+              '- Optional stage label: `release:alpha` | `release:beta` | `release:rc`' \
+              '- Add a label to continue — this check will re-run automatically' \
+              '' \
+              "${marker}")
+            # Soft-fail UX: post/update comment, then fail so merge stays blocked (no version push).
+            existing_id=$(gh api "repos/${GH_REPO}/issues/${PR_NUMBER}/comments" \
+              --jq ".[] | select(.body | contains(\"${marker}\")) | .id" | head -1 || true)
+            if [ -n "$existing_id" ]; then
+              gh api -X PATCH "repos/${GH_REPO}/issues/comments/${existing_id}" -f body="$body" >/dev/null
+            else
+              gh api -X POST "repos/${GH_REPO}/issues/${PR_NUMBER}/comments" -f body="$body" >/dev/null
+            fi
             echo "::error::Add exactly one semver label: release:patch, release:minor, or release:major"
             exit 1
           fi
@@ -73,14 +93,30 @@ jobs:
       - name: Compute next version from tags on main
         id: version
         run: |
+          set -euo pipefail
           git fetch origin main --tags
 
           stage="${{ steps.bump.outputs.stage }}"
 
-          # Get the latest stable tag for the semver base
+          # Floor at the higher of: latest stable tag on main, package.json on main.
+          # Prevents regressing to 0.0.x after a tags wipe while package.json is ahead.
           latest_stable=$(git tag -l 'v*' --merged origin/main | grep -v '-' | sort -V | tail -1 || true)
           latest_stable=${latest_stable#v}
           latest_stable=${latest_stable:-0.0.0}
+          main_pkg=$(git show origin/main:package.json | node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).version.split('-')[0]")
+
+          latest_stable=$(node -e "
+            const a = process.argv[1].split('.').map(Number);
+            const b = process.argv[2].split('.').map(Number);
+            for (let i = 0; i < 3; i++) {
+              if ((a[i]||0) !== (b[i]||0)) {
+                process.stdout.write((a[i]||0) > (b[i]||0) ? process.argv[1] : process.argv[2]);
+                process.exit(0);
+              }
+            }
+            process.stdout.write(process.argv[1]);
+          " "$latest_stable" "$main_pkg")
+
           IFS=. read -r major minor patch <<< "$latest_stable"
 
           case "${{ steps.bump.outputs.level }}" in
@@ -94,7 +130,6 @@ jobs:
           if [ "$stage" = "stable" ]; then
             echo "next=${base}" >> "$GITHUB_OUTPUT"
           else
-            # Find the latest prerelease tag for this base+stage and increment
             existing=$(git tag -l "v${base}-${stage}.*" | sort -V | tail -1 || true)
             if [ -n "$existing" ]; then
               pre_num=$(echo "$existing" | grep -oE '[0-9]+$')
@@ -152,7 +187,7 @@ jobs:
               versionStatus,
               '- [ ] `CHANGELOG.md` updated for user-facing changes',
               '- [ ] CI checks pass',
-              '- [ ] After merge, the **Release** workflow tags `main` and publishes exactly 3 installers (dmg / exe / AppImage)',
+              '- [ ] After merge, the **Release** workflow (push to `main`) tags and publishes exactly 3 installers (dmg / exe / AppImage) plus OTA feed files',
               '',
               marker,
             ].join('\n');
