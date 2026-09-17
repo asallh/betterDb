@@ -10,10 +10,15 @@
   },
   files: ["dist", "dist-electron"],
   publish: null,
+  afterSign: "scripts/notarize.cjs",
   mac: {
     icon: "build/betterDB.icns",
     target: ["dmg"],
     artifactName: "${productName}-Mac-${version}-Installer.${ext}",
+    hardenedRuntime: true,
+    gatekeeperAssess: false,
+    entitlements: "build/entitlements.mac.plist",
+    entitlementsInherit: "build/entitlements.mac.plist",
   },
   win: {
     icon: "build/betterDB.ico",

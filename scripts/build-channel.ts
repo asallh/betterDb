@@ -93,6 +93,7 @@ function parseArgs(argv: string[]): {
 function applyChannel(channel: BuildChannel): {
   version: string;
   productName: string;
+  executableName: string;
 } {
   const identity = CHANNEL_IDENTITIES[channel];
   const pkg = JSON.parse(read("package.json").toString("utf8")) as {
@@ -130,7 +131,11 @@ function applyChannel(channel: BuildChannel): {
     patchElectronBuilderConfig(builder, identity),
   );
 
-  return { version: pkg.version, productName: identity.productName };
+  return {
+    version: pkg.version,
+    productName: identity.productName,
+    executableName: identity.executableName,
+  };
 }
 
 function main(): void {
@@ -143,11 +148,13 @@ function main(): void {
 
   let builtVersion = "";
   let identityName = "";
+  let executableName = "";
 
   try {
     const applied = applyChannel(channel);
     builtVersion = applied.version;
     identityName = applied.productName;
+    executableName = applied.executableName;
 
     console.log(`\nPackaging ${identityName} v${builtVersion}`);
     console.log(`Targets: ${builderTargets.join(" ")}\n`);
@@ -164,6 +171,7 @@ function main(): void {
         "never",
         ...passthrough,
       ],
+      // Local smoke builds stay unsigned; CI Nightly/Release sign + notarize.
       { CSC_IDENTITY_AUTO_DISCOVERY: "false" },
     );
 
@@ -187,7 +195,7 @@ function main(): void {
       console.log(`  open "${outDir}"/mac-arm64/*.app`);
       console.log("  # or mac/ on Intel");
       console.log(
-        `If Gatekeeper blocks a copied .app: xattr -cr "/Applications/${identityName}.app"`,
+        `If Gatekeeper blocks an unsigned local .app: xattr -cr "/Applications/${executableName}.app"`,
       );
     }
   } finally {

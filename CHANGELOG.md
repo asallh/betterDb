@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Hardened the release pipeline so GitHub Releases publish only the three platform installers.
 - Nightly packages install as **BetterDB Nightly** (`com.betterdb.app.nightly`) with a separate user-data directory so they can run beside production.
+- macOS Nightly and Release CI now **Developer ID–sign and notarize** DMGs (fails closed if signing secrets are missing) so Chrome downloads no longer show Gatekeeper’s “damaged” dialog.
 
 ## [0.1.0-beta.1] - 2026-06-24
 
