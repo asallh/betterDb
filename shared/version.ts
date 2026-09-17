@@ -73,6 +73,19 @@ export function appDisplayNameForVersion(version: string): string {
   return isNightlyVersion(version) ? "BetterDB Nightly" : "BetterDB";
 }
 
+/** Public brand PNG path for in-app marks and favicon (alpha/beta/rc keep prod).
+ * Relative (`./`) so Electron `loadFile` resolves under dist/, not `/`.
+ */
+export function brandIconSrcForVersion(
+  version: string,
+  channel: AppChannel = "auto",
+): string {
+  const { stage } = resolveVersionInfo(version, channel);
+  if (stage === "dev") return "./betterDB-dev.png";
+  if (stage === "nightly") return "./betterDB-nightly.png";
+  return "./betterDB.png";
+}
+
 /** Strip leading `v` / whitespace for comparison. */
 export function normalizeVersion(version: string): string {
   return version.trim().replace(/^v/i, "");
