@@ -172,7 +172,8 @@ jobs:
         run: |
           set -euo pipefail
           # Distinct appId + productName so Nightly installs beside production.
-          # Publish channel "nightly" → latest-*-nightly.yml for electron-updater.
+          # Publish channel "nightly" → nightly-*.yml for electron-updater.
+          # Keep Mac zip + yml/blockmaps so silent OTA works on the nightly channel.
           # artifactName uses BetterDB-Nightly (no spaces) for stable CI globs.
           node <<'NODE'
             const fs = require("node:fs");
@@ -213,12 +214,6 @@ jobs:
                 'publish: {\n    channel: "nightly",'
               );
             }
-            // Nightly: ship only the public Mac installer (dmg). Skip zip —
-            // zip is ~120MB and only needed for silent electron-updater OTA.
-            text = text.replace(
-              /target:\s*\["dmg",\s*"zip"\]/,
-              'target: ["dmg"]'
-            );
             fs.writeFileSync(path, text);
             console.log(fs.readFileSync(path, "utf8"));
           NODE
@@ -259,12 +254,12 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
-      - name: Stage installer
+      - name: Stage installer and update metadata
         uses: ./.github/actions/stage-installers
         with:
           version: ${{ needs.gate.outputs.version }}
           platform: ${{ matrix.platform }}
-          include_ota: "false"
+          include_ota: "true"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -285,22 +280,30 @@ jobs:
           pattern: betterdb-${{ needs.gate.outputs.version }}-*
           merge-multiple: true
 
-      - name: Collect installers
+      - name: Collect installers and update metadata
         run: |
           set -euo pipefail
           mkdir -p installers
           shopt -s nullglob
           for f in artifacts/*; do
             [ -f "$f" ] || continue
-            case "$f" in
-              *.dmg|*.exe|*.AppImage) cp "$f" installers/ ;;
-            esac
+            base=$(basename "$f")
+            if [ "$base" = "builder-debug.yml" ]; then
+              continue
+            fi
+            cp "$f" installers/
           done
           count=$(find installers -type f \( -name '*.dmg' -o -name '*.exe' -o -name '*.AppImage' \) | wc -l | tr -d ' ')
-          echo "Release upload set (installers only):"
+          yml_count=$(find installers -type f -name '*.yml' | wc -l | tr -d ' ')
+          echo "Release upload set (installers + OTA feeds):"
           ls -la installers
           if [ "$count" -ne 3 ]; then
             echo "::error::Expected exactly 3 installers (mac/win/linux), found $count"
+            find artifacts -type f | sort || true
+            exit 1
+          fi
+          if [ "$yml_count" -lt 1 ]; then
+            echo "::error::Expected electron-updater channel yml files (nightly*.yml), found $yml_count"
             find artifacts -type f | sort || true
             exit 1
           fi
