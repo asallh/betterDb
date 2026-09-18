@@ -73,6 +73,25 @@ export function appDisplayNameForVersion(version: string): string {
   return isNightlyVersion(version) ? "BetterDB Nightly" : "BetterDB";
 }
 
+/** Fields for the File → About dialog (name, version, Nightly vs Release, …). */
+export function aboutReleaseSummary(version: string): {
+  appName: string;
+  version: string;
+  releaseType: string;
+} {
+  const info = parseVersion(version);
+  return {
+    appName: appDisplayNameForVersion(version),
+    version: info.version,
+    releaseType: info.label,
+  };
+}
+
+export function formatAboutDetail(version: string): string {
+  const about = aboutReleaseSummary(version);
+  return `Version ${about.version}\nRelease type: ${about.releaseType}`;
+}
+
 /** Public brand PNG path for in-app marks and favicon (alpha/beta/rc keep prod).
  * Relative (`./`) so Electron `loadFile` resolves under dist/, not `/`.
  */

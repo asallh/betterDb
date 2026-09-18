@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  aboutReleaseSummary,
   compareVersions,
   appDisplayNameForVersion,
   brandIconSrcForVersion,
+  formatAboutDetail,
   isNightlyVersion,
   isVersionBehind,
   normalizeVersion,
@@ -77,6 +79,24 @@ describe("appDisplayNameForVersion", () => {
     );
     expect(appDisplayNameForVersion("0.1.0-beta.1")).toBe("BetterDB");
     expect(appDisplayNameForVersion("1.0.0")).toBe("BetterDB");
+  });
+});
+
+describe("aboutReleaseSummary / formatAboutDetail", () => {
+  it("labels nightly vs release for the About dialog", () => {
+    expect(aboutReleaseSummary("0.1.1-nightly.20260918.5cedd21")).toEqual({
+      appName: "BetterDB Nightly",
+      version: "0.1.1-nightly.20260918.5cedd21",
+      releaseType: "Nightly",
+    });
+    expect(aboutReleaseSummary("0.1.1")).toEqual({
+      appName: "BetterDB",
+      version: "0.1.1",
+      releaseType: "Release",
+    });
+    expect(formatAboutDetail("0.1.1-beta.2")).toBe(
+      "Version 0.1.1-beta.2\nRelease type: Beta",
+    );
   });
 });
 

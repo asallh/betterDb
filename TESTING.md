@@ -43,6 +43,7 @@ Checklist:
 - [ ] Packaged build whose version **matches** (or is ahead of) latest shows no update indicator
 - [ ] With network blocked / GitHub unreachable, the app still opens (fail-open) and the status bar can show “Update check failed”
 - [ ] Release assets include platform installers **plus** `latest*.yml` / blockmaps (and Mac zip for silent OTA)
+- [ ] Nightly release assets include platform installers **plus** `nightly*.yml` / blockmaps (and Mac zip for silent OTA)
 - [ ] Nightly install only offers newer nightlies; production/prerelease ignores nightly tags
 
 Local Vite/Electron serve skips auto-update (`app.isPackaged` is false).

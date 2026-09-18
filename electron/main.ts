@@ -4,6 +4,7 @@ import path from "node:path";
 import { ConnectionManager } from "./db/ConnectionManager";
 import { registerIpcHandlers } from "./ipc/handlers";
 import { registerUpdaterIpcHandlers } from "./ipc/updaterHandlers";
+import { installAppMenu } from "./menu/appMenu";
 import {
   configureAutoUpdater,
   startAutoUpdateCheck,
@@ -99,6 +100,7 @@ app.on("activate", () => {
 app.whenReady().then(() => {
   registerUpdaterIpcHandlers();
   registerIpcHandlers(connectionManager);
+  installAppMenu();
 
   configureAutoUpdater({ getMainWindow: () => win });
   createWindow();
