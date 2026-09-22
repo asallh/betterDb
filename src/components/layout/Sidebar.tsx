@@ -254,7 +254,7 @@ export function Sidebar() {
               </div>
             </div>
           )}
-          <span className="h-2 w-2 rounded-full bg-primary shrink-0 shadow-[0_0_0_3px_hsl(var(--primary)/0.18)]" />
+          <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0 shadow-[0_0_0_3px_rgb(16_185_129/0.18)]" />
         </div>
       )}
 

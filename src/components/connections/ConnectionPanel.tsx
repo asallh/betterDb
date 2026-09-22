@@ -188,7 +188,7 @@ export function ConnectionPanel() {
               <div className="flex gap-0.5 items-center">
                 {isActive ? (
                   <>
-                    <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0 mr-1 shadow-[0_0_0_2px_hsl(var(--primary)/0.2)]" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0 mr-1 shadow-[0_0_0_2px_rgb(16_185_129/0.2)]" />
                     <button
                       onClick={() => disconnect()}
                       className="rounded p-1 opacity-0 group-hover:opacity-100 hover:bg-destructive/10 text-destructive transition-all"
