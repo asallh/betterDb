@@ -58,33 +58,18 @@ export class PostgresAdapter extends DatabaseAdapter {
   }
 
   async connect(): Promise<void> {
-    this.pool = new Pool({
-      host: this.config.host,
-      port: this.config.port,
-      database: this.config.database,
-      user: this.config.user,
-      password: this.config.password,
-      ssl: this.buildSslOption(),
-      max: 3,
-      idleTimeoutMillis: 30000,
-    });
+    this.pool = new Pool(this.buildPoolConfig());
     try {
       const client = await this.pool.connect();
       client.release();
     } catch (err: unknown) {
       // If the server requires encryption and we didn't use SSL, retry with SSL
       const msg = err instanceof Error ? err.message : "";
-      if (!this.config.ssl && msg.includes("no encryption")) {
+      if (!this.config.ssl && !this.config.connectionString?.trim() && msg.includes("no encryption")) {
         await this.pool.end().catch(() => {});
         this.pool = new Pool({
-          host: this.config.host,
-          port: this.config.port,
-          database: this.config.database,
-          user: this.config.user,
-          password: this.config.password,
+          ...this.buildPoolConfig({ forceSsl: true }),
           ssl: { rejectUnauthorized: false },
-          max: 3,
-          idleTimeoutMillis: 30000,
         });
         const client = await this.pool.connect();
         client.release();
@@ -92,6 +77,43 @@ export class PostgresAdapter extends DatabaseAdapter {
         throw err;
       }
     }
+  }
+
+  /**
+   * Prefer a pasted connection string (Lakebase Autoscaling URI / libpq) when
+   * present; otherwise use discrete host/user/password fields. SSL options from
+   * the form always win so cloud certs can allow self-signed / require TLS.
+   */
+  private buildPoolConfig(opts?: { forceSsl?: boolean }): pg.PoolConfig {
+    const ssl = this.buildSslOption(opts?.forceSsl);
+    const connectionString = this.config.connectionString?.trim();
+    if (connectionString) {
+      // Strip sslmode (URI query or libpq keyword) so node-pg does not escalate
+      // require → verify-full; we apply SSL via the explicit ssl option instead.
+      const sanitized = connectionString
+        .replace(/([?&])sslmode=[^&]*/gi, "$1")
+        .replace(/[?&]$/, "")
+        .replace(/\?&/, "?")
+        .replace(/\bsslmode=\S+/gi, "")
+        .replace(/\s{2,}/g, " ")
+        .trim();
+      return {
+        connectionString: sanitized,
+        ssl: ssl || undefined,
+        max: 3,
+        idleTimeoutMillis: 30000,
+      };
+    }
+    return {
+      host: this.config.host,
+      port: this.config.port,
+      database: this.config.database,
+      user: this.config.user,
+      password: this.config.password,
+      ssl,
+      max: 3,
+      idleTimeoutMillis: 30000,
+    };
   }
 
   async disconnect(): Promise<void> {

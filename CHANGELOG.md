@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Channel-specific app icons: local serve uses a blueprint/white cylinder icon; nightlies ship a night-sky/purple cylinder icon; production keeps the existing dark/coral art.
 - Channel-aware update feeds: nightly installs only consider newer nightlies; non-nightly installs ignore nightly releases.
 - Local channel packaging commands: `npm run build:nightly` and `npm run build:prod` for side-by-side test installers.
+- **Databricks Lakebase Autoscaling** connection-string support: paste a Lakebase URI (including OAuth email roles), JDBC URI, or libpq `host=…` string to connect; regional Autoscaling hostnames are auto-detected as the Databricks Lakebase engine with SSL and `databricks_postgres` defaults.
 
 ### Changed
 
