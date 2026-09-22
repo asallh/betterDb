@@ -4,7 +4,6 @@ import { db } from "@/lib/ipc";
 import {
   DATABASE_ENGINE_ORDER,
   DATABASE_ENGINES,
-  engineFromScheme,
   getDefaultDatabase,
   getDefaultPort,
   getDefaultUser,
@@ -13,6 +12,12 @@ import {
   supportsSslRejectUnauthorized,
   supportsTrustServerCertificate,
 } from "@/lib/databaseEngines";
+import {
+  buildConnectionString,
+  detectEngineFromHost,
+  isCloudHost,
+  parseConnectionString,
+} from "@/lib/connectionString";
 import type { ConnectionConfig } from "../../../shared/types";
 import { CheckCircle, XCircle, Loader2, Link } from "lucide-react";
 
@@ -25,7 +30,7 @@ function defaultFormState(): {
   password: string;
   ssl: boolean;
   sslRejectUnauthorized: boolean;
-    trustServerCertificate: boolean;
+  trustServerCertificate: boolean;
   engine: ConnectionConfig["engine"];
 } {
   return {
@@ -48,104 +53,6 @@ interface Props {
 }
 
 type FormMode = "fields" | "uri";
-
-function parseConnectionString(uri: string): Partial<ConnectionConfig> | null {
-  try {
-    const scheme = uri.match(/^([a-z]+):\/\//i)?.[1]?.toLowerCase();
-    if (!scheme) return null;
-
-    const engine = engineFromScheme(scheme);
-
-    if (!engine) return null;
-
-    if (engine === "sqlite") {
-      const database =
-        scheme === "file"
-          ? decodeURIComponent(new URL(uri).pathname)
-          : decodeURIComponent(uri.replace(/^sqlite:\/\//i, ""));
-      return {
-        engine,
-        host: "",
-        port: 0,
-        database,
-        user: "",
-        password: "",
-        ssl: false,
-      };
-    }
-
-    // Use http:// for parsing since database URL schemes are not all "special"
-    // URL schemes and can otherwise parse credentials/host inconsistently.
-    const url = new URL(uri.replace(/^[a-z]+:\/\//i, "http://"));
-    const defaultPort = getDefaultPort(engine);
-    const defaultUser = getDefaultUser(engine);
-
-    return {
-      engine,
-      host: url.hostname || "localhost",
-      port: parseInt(url.port, 10) || defaultPort,
-      database: url.pathname.replace(/^\//, "") || getDefaultDatabase(engine),
-      user: url.username || defaultUser,
-      password: decodeURIComponent(url.password || ""),
-      ssl: url.searchParams.get("sslmode") === "require" ||
-        url.searchParams.get("ssl") === "true" ||
-        url.searchParams.get("encrypt") === "true",
-      trustServerCertificate:
-        url.searchParams.get("trustServerCertificate") === "true" ||
-        url.searchParams.get("trustServerCertificate") === "1",
-    };
-  } catch {
-    return null;
-  }
-}
-
-function isCloudHost(host: string): boolean {
-  const h = host.toLowerCase();
-  return h.includes("supabase") || h.includes("rds.amazonaws.com") || h.includes("redshift.amazonaws.com") || h.includes("neon.tech") || h.includes("aivencloud.com") || h.includes("databricks") || h.includes("planetscale") || h.includes("oraclecloud");
-}
-
-function detectEngine(host: string): ConnectionConfig["engine"] {
-  const h = host.toLowerCase();
-  if (h.includes("database.windows.net")) return "sqlserver";
-  if (h.includes("oraclecloud")) return "oracle";
-  if (h.includes("mariadb")) return "mariadb";
-  if (h.includes("mysql") || h.includes("planetscale")) return "mysql";
-  if (h.includes("supabase")) return "supabase";
-  if (h.includes("rds.amazonaws.com") || h.includes("redshift.amazonaws.com") || h.includes("aws")) return "aws";
-  if (h.includes("databricks")) return "databricks";
-  return "postgres";
-}
-
-function buildConnectionString(form: {
-  host: string;
-  port: string;
-  database: string;
-  user: string;
-  password: string;
-  ssl: boolean;
-  trustServerCertificate?: boolean;
-  engine: ConnectionConfig["engine"];
-}): string {
-  if (form.engine === "sqlite") {
-    return form.database ? `sqlite://${form.database}` : "";
-  }
-  const pass = form.password ? `:${encodeURIComponent(form.password)}` : "";
-  const scheme =
-    form.engine === "sqlserver"
-      ? "sqlserver"
-      : form.engine === "mysql" || form.engine === "mariadb" || form.engine === "oracle"
-        ? form.engine
-        : "postgresql";
-  const params = new URLSearchParams();
-  if (form.engine === "sqlserver") {
-    if (form.ssl) params.set("encrypt", "true");
-    if (form.trustServerCertificate) params.set("trustServerCertificate", "true");
-  } else if (supportsSsl(form.engine) && form.ssl) {
-    params.set("sslmode", "require");
-  }
-  const query = params.size > 0 ? `?${params.toString()}` : "";
-  return `${scheme}://${form.user}${pass}@${form.host}:${form.port}/${form.database}${query}`;
-}
 
 export function ConnectionForm({ connectionId, onClose }: Props) {
   const saveConnection = useConnectionStore((s) => s.saveConnection);
@@ -187,16 +94,17 @@ export function ConnectionForm({ connectionId, onClose }: Props) {
         };
         setForm(next);
         setConnectionString(
-          buildConnectionString({
-            host: c.host,
-            port: String(c.port),
-            database: c.database,
-            user: c.user,
-            password: c.password,
-            ssl: c.ssl ?? false,
-            trustServerCertificate: c.trustServerCertificate,
-            engine: c.engine,
-          })
+          c.connectionString?.trim() ||
+            buildConnectionString({
+              host: c.host,
+              port: String(c.port),
+              database: c.database,
+              user: c.user,
+              password: c.password,
+              ssl: c.ssl ?? false,
+              trustServerCertificate: c.trustServerCertificate,
+              engine: c.engine,
+            })
         );
         setIsLoading(false);
       })
@@ -222,14 +130,16 @@ export function ConnectionForm({ connectionId, onClose }: Props) {
     if (parsed) {
       const newHost = parsed.host ?? form.host;
       const cloud = isCloudHost(newHost);
-      const nextEngine = parsed.engine ?? detectEngine(newHost);
+      const nextEngine = parsed.engine ?? detectEngineFromHost(newHost);
       setForm((f) => ({
         ...f,
         host: newHost,
         port: String(parsed.port ?? f.port),
         database: parsed.database ?? f.database,
         user: parsed.user ?? f.user,
-        password: parsed.password ?? f.password,
+        // Keep a manually entered OAuth token when the pasted URI omits one
+        // (Lakebase OAuth copy buttons often leave the password empty).
+        password: parsed.password || f.password,
         ssl: supportsSsl(nextEngine)
           ? nextEngine === "sqlserver"
             ? (parsed.ssl ?? f.ssl)
@@ -246,6 +156,12 @@ export function ConnectionForm({ connectionId, onClose }: Props) {
     }
   }
 
+  const uriValid =
+    !connectionString || parseConnectionString(connectionString) !== null;
+  const hasRequiredFields =
+    (requiresHost(form.engine) ? Boolean(form.host) : true) &&
+    Boolean(form.database);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-4">
@@ -255,7 +171,8 @@ export function ConnectionForm({ connectionId, onClose }: Props) {
   }
 
   function buildConfig(): ConnectionConfig {
-    return {
+    const ssl = supportsSsl(form.engine) ? form.ssl : false;
+    const config: ConnectionConfig = {
       id: connectionId ?? crypto.randomUUID(),
       engine: form.engine,
       name: form.name || `${form.host}/${form.database}`,
@@ -264,14 +181,32 @@ export function ConnectionForm({ connectionId, onClose }: Props) {
       database: form.database,
       user: form.user,
       password: form.password,
-      ssl: supportsSsl(form.engine) ? form.ssl : false,
-      ...(supportsSslRejectUnauthorized(form.engine) && form.ssl && {
+      ssl,
+      ...(supportsSslRejectUnauthorized(form.engine) && ssl && {
         sslRejectUnauthorized: form.sslRejectUnauthorized,
       }),
       ...(supportsTrustServerCertificate(form.engine) && {
         trustServerCertificate: form.trustServerCertificate,
       }),
     };
+
+    // When connecting via a pasted Lakebase / Postgres URI, also store a
+    // rebuilt connection string (with any OAuth token filled in) so node-pg
+    // can use the URI path directly.
+    if (mode === "uri" && connectionString.trim() && uriValid) {
+      config.connectionString = buildConnectionString({
+        host: form.host,
+        port: form.port,
+        database: form.database,
+        user: form.user,
+        password: form.password,
+        ssl,
+        trustServerCertificate: form.trustServerCertificate,
+        engine: form.engine,
+      });
+    }
+
+    return config;
   }
 
   async function handleTest() {
@@ -300,9 +235,6 @@ export function ConnectionForm({ connectionId, onClose }: Props) {
 
   const inputClass =
     "w-full rounded-lg border border-input bg-background px-2.5 py-1.5 text-xs outline-none transition-shadow focus:ring-1 focus:ring-ring";
-  const uriValid = !connectionString || parseConnectionString(connectionString) !== null;
-  const hasRequiredFields =
-    (requiresHost(form.engine) ? Boolean(form.host) : true) && Boolean(form.database);
 
   return (
     <div className="space-y-3">
@@ -342,18 +274,46 @@ export function ConnectionForm({ connectionId, onClose }: Props) {
             </label>
             <textarea
               className={`${inputClass} resize-none font-mono`}
-              rows={2}
-              placeholder="postgresql://user:pass@host:5432/db, mysql://user:pass@host:3306/db, oracle://user:pass@host:1521/service, or sqlite:///path/db.sqlite"
+              rows={3}
+              placeholder="postgresql://you@company.com@ep-….database.us-east-1.cloud.databricks.com/databricks_postgres?sslmode=require"
               value={connectionString}
               onChange={(e) => applyUri(e.target.value)}
               spellCheck={false}
             />
+            <p className="mt-1 text-[10px] text-muted-foreground">
+              Paste a Databricks Lakebase Autoscaling URI, JDBC URI, or libpq{" "}
+              <span className="font-mono">host=…</span> string. Databricks hosts
+              are detected automatically with SSL enabled.
+            </p>
             {connectionString && !uriValid && (
               <p className="mt-1 text-[10px] text-destructive">
                 Invalid connection string format
               </p>
             )}
           </div>
+          {form.engine !== "sqlite" && (
+            <div>
+              <label className="mb-1 block text-[11px] text-muted-foreground">
+                Password / OAuth token
+              </label>
+              <input
+                className={inputClass}
+                type="password"
+                placeholder={
+                  form.engine === "databricks"
+                    ? "Postgres password or Lakebase OAuth token"
+                    : "Password (if not in the URI)"
+                }
+                value={form.password}
+                onChange={(e) => setForm({ ...form, password: e.target.value })}
+              />
+              {form.engine === "databricks" && !form.password && (
+                <p className="mt-1 text-[10px] text-muted-foreground">
+                  Lakebase OAuth URIs often omit the token — paste it here.
+                </p>
+              )}
+            </div>
+          )}
           <div>
             <label className="mb-1 block text-[11px] text-muted-foreground">
               Connection Name
@@ -431,7 +391,7 @@ export function ConnectionForm({ connectionId, onClose }: Props) {
                   onChange={(e) => {
                     const host = e.target.value;
                     const cloud = isCloudHost(host);
-                    const detectedEngine = detectEngine(host);
+                    const detectedEngine = detectEngineFromHost(host);
                     const shouldAutoDetect = ["postgres", "supabase", "aws", "databricks"].includes(form.engine);
                     const engine = shouldAutoDetect ? detectedEngine : form.engine;
                     setForm({
@@ -487,14 +447,18 @@ export function ConnectionForm({ connectionId, onClose }: Props) {
                 </label>
                 <input
                   className={inputClass}
-                  placeholder={getDefaultUser(form.engine)}
+                  placeholder={
+                    form.engine === "databricks"
+                      ? "role or you@company.com"
+                      : getDefaultUser(form.engine)
+                  }
                   value={form.user}
                   onChange={(e) => setForm({ ...form, user: e.target.value })}
                 />
               </div>
               <div>
                 <label className="mb-0.5 block text-[11px] text-muted-foreground">
-                  Password
+                  {form.engine === "databricks" ? "Password / OAuth token" : "Password"}
                 </label>
                 <input
                   className={inputClass}

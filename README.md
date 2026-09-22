@@ -27,7 +27,7 @@ BetterDB is a lightweight desktop application for managing SQL warehouses, docum
 
 | Engine | Kind | Notes |
 | ------ | ---- | ----- |
-| PostgreSQL | SQL | Also Supabase, AWS/RDS Postgres, Databricks, CockroachDB |
+| PostgreSQL | SQL | Also Supabase, AWS/RDS Postgres, Databricks Lakebase (Autoscaling), CockroachDB |
 | MySQL / MariaDB | SQL | |
 | SQL Server | SQL | |
 | Oracle | SQL | Requires Oracle Instant Client locally |
