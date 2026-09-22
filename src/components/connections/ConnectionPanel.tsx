@@ -1,7 +1,10 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useConnectionStore } from "@/stores/connectionStore";
 import { useUiStore } from "@/stores/uiStore";
+import { db } from "@/lib/ipc";
 import { DatabaseEngineIcon } from "@/components/icons/DatabaseIcons";
+import { buildDuplicatedConnection } from "./duplicateConnection";
 import {
   Trash2,
   Plug,
@@ -9,18 +12,27 @@ import {
   Pencil,
   Loader2,
   MoreVertical,
+  Copy,
 } from "lucide-react";
 
 function ConnectionMenu({
+  isActive,
+  onConnect,
+  onDisconnect,
+  onDuplicate,
   onEdit,
   onDelete,
   onClose,
   anchorRef,
 }: {
+  isActive: boolean;
+  onConnect: () => void;
+  onDisconnect: () => void;
+  onDuplicate: () => void;
   onEdit: () => void;
   onDelete: () => void;
   onClose: () => void;
-  anchorRef: React.RefObject<HTMLButtonElement>;
+  anchorRef: React.RefObject<HTMLButtonElement | null>;
 }) {
   const menuRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
@@ -43,29 +55,96 @@ function ConnectionMenu({
         onClose();
       }
     }
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
     document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
   }, [onClose, anchorRef]);
+
+  // Clamp so the menu stays in the viewport
+  useEffect(() => {
+    if (!menuRef.current || !pos) return;
+    const rect = menuRef.current.getBoundingClientRect();
+    if (rect.right > window.innerWidth) {
+      menuRef.current.style.left = `${window.innerWidth - rect.width - 8}px`;
+    }
+    if (rect.left < 8) {
+      menuRef.current.style.left = "8px";
+    }
+    if (rect.bottom > window.innerHeight) {
+      menuRef.current.style.top = `${window.innerHeight - rect.height - 8}px`;
+    }
+    if (rect.top < 8) {
+      menuRef.current.style.top = "8px";
+    }
+  }, [pos]);
 
   if (!pos) return null;
 
-  return (
+  const itemClass =
+    "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs hover:bg-accent transition-colors";
+
+  const menu = (
     <div
       ref={menuRef}
-      className="fixed z-50 min-w-[120px] rounded-md border glass-strong p-1"
+      className="fixed z-50 min-w-[140px] rounded-md border glass-strong p-1"
       style={{ top: pos.top, left: pos.left, transform: "translateX(-100%)" }}
+      role="menu"
     >
+      {isActive ? (
+        <button
+          role="menuitem"
+          onClick={() => {
+            onDisconnect();
+            onClose();
+          }}
+          className={itemClass}
+        >
+          <PlugZap className="h-3 w-3" />
+          Disconnect
+        </button>
+      ) : (
+        <button
+          role="menuitem"
+          onClick={() => {
+            onConnect();
+            onClose();
+          }}
+          className={itemClass}
+        >
+          <Plug className="h-3 w-3" />
+          Connect
+        </button>
+      )}
       <button
+        role="menuitem"
+        onClick={() => {
+          onDuplicate();
+          onClose();
+        }}
+        className={itemClass}
+      >
+        <Copy className="h-3 w-3" />
+        Duplicate
+      </button>
+      <button
+        role="menuitem"
         onClick={() => {
           onEdit();
           onClose();
         }}
-        className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs hover:bg-accent transition-colors"
+        className={itemClass}
       >
         <Pencil className="h-3 w-3" />
         Edit
       </button>
       <button
+        role="menuitem"
         onClick={() => {
           onDelete();
           onClose();
@@ -77,6 +156,8 @@ function ConnectionMenu({
       </button>
     </div>
   );
+
+  return createPortal(menu, document.body);
 }
 
 function ConfirmDeleteDialog({
@@ -99,17 +180,28 @@ function ConfirmDeleteDialog({
         onCancel();
       }
     }
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onCancel();
+    }
     document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
   }, [onCancel]);
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-[2px]">
       <div
         ref={dialogRef}
         className="mx-4 w-full max-w-sm rounded-2xl border border-border/80 bg-card p-5 shadow-[0_16px_48px_hsl(0_0%_0%/0.28)]"
+        role="dialog"
+        aria-labelledby="delete-connection-title"
       >
-        <h3 className="text-sm font-semibold">Delete connection</h3>
+        <h3 id="delete-connection-title" className="text-sm font-semibold">
+          Delete connection
+        </h3>
         <p className="mt-2 text-xs text-muted-foreground">
           Are you sure you want to delete{" "}
           <span className="font-medium text-foreground">{connName}</span>?
@@ -130,7 +222,8 @@ function ConfirmDeleteDialog({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -139,6 +232,7 @@ export function ConnectionPanel() {
   const connect = useConnectionStore((s) => s.connect);
   const disconnect = useConnectionStore((s) => s.disconnect);
   const deleteConnection = useConnectionStore((s) => s.deleteConnection);
+  const saveConnection = useConnectionStore((s) => s.saveConnection);
   const activeConnectionId = useConnectionStore((s) => s.activeConnectionId);
   const isConnecting = useConnectionStore((s) => s.isConnecting);
   const error = useConnectionStore((s) => s.error);
@@ -147,6 +241,14 @@ export function ConnectionPanel() {
   const menuButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const [confirmDeleteConn, setConfirmDeleteConn] =
     useState<{ id: string; name: string } | null>(null);
+
+  const handleDuplicate = useCallback(
+    async (id: string) => {
+      const source = await db.getConnection(id);
+      await saveConnection(buildDuplicatedConnection(source));
+    },
+    [saveConnection]
+  );
 
   return (
     <div className="max-h-80 overflow-auto">
@@ -212,12 +314,17 @@ export function ConnectionPanel() {
                   </button>
                 )}
                 <button
-                  ref={(el) => { menuButtonRefs.current[conn.id] = el; }}
+                  ref={(el) => {
+                    menuButtonRefs.current[conn.id] = el;
+                  }}
                   onClick={() =>
                     setMenuOpenId(menuOpenId === conn.id ? null : conn.id)
                   }
                   className="rounded p-1 opacity-0 group-hover:opacity-100 hover:bg-muted text-muted-foreground transition-all"
                   title="Options"
+                  aria-label={`Options for ${conn.name}`}
+                  aria-haspopup="menu"
+                  aria-expanded={menuOpenId === conn.id}
                 >
                   <MoreVertical className="h-3 w-3" />
                 </button>
@@ -225,10 +332,20 @@ export function ConnectionPanel() {
 
               {menuOpenId === conn.id && menuButtonRefs.current[conn.id] && (
                 <ConnectionMenu
+                  isActive={isActive}
+                  onConnect={() => connect(conn.id)}
+                  onDisconnect={() => disconnect()}
+                  onDuplicate={() => {
+                    void handleDuplicate(conn.id);
+                  }}
                   onEdit={() => openConnectionForm(conn.id)}
-                  onDelete={() => setConfirmDeleteConn({ id: conn.id, name: conn.name })}
+                  onDelete={() =>
+                    setConfirmDeleteConn({ id: conn.id, name: conn.name })
+                  }
                   onClose={() => setMenuOpenId(null)}
-                  anchorRef={{ current: menuButtonRefs.current[conn.id] } as React.RefObject<HTMLButtonElement>}
+                  anchorRef={{
+                    current: menuButtonRefs.current[conn.id],
+                  }}
                 />
               )}
             </div>
@@ -246,7 +363,7 @@ export function ConnectionPanel() {
         <ConfirmDeleteDialog
           connName={confirmDeleteConn.name}
           onConfirm={() => {
-            deleteConnection(confirmDeleteConn.id);
+            void deleteConnection(confirmDeleteConn.id);
             setConfirmDeleteConn(null);
           }}
           onCancel={() => setConfirmDeleteConn(null)}
