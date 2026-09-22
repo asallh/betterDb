@@ -27,16 +27,22 @@ const connections: ConnectionConfig[] = [
   },
 ];
 
-const connect = vi.fn(async () => undefined);
-const disconnect = vi.fn(async () => undefined);
-const deleteConnection = vi.fn(async () => undefined);
-const saveConnection = vi.fn(async () => undefined);
-const openConnectionForm = vi.fn();
-const getConnection = vi.fn(async (id: string) => {
-  const found = connections.find((c) => c.id === id);
-  if (!found) throw new Error("not found");
-  return { ...found, password: "secret" };
-});
+const connect = vi.fn<(id: string) => Promise<void>>(async () => undefined);
+const disconnect = vi.fn<() => Promise<void>>(async () => undefined);
+const deleteConnection = vi.fn<(id: string) => Promise<void>>(
+  async () => undefined
+);
+const saveConnection = vi.fn<(config: ConnectionConfig) => Promise<void>>(
+  async () => undefined
+);
+const openConnectionForm = vi.fn<(id: string | null) => void>();
+const getConnection = vi.fn<(id: string) => Promise<ConnectionConfig>>(
+  async (id) => {
+    const found = connections.find((c) => c.id === id);
+    if (!found) throw new Error("not found");
+    return { ...found, password: "secret" };
+  }
+);
 
 let activeConnectionId: string | null = null;
 
@@ -130,7 +136,7 @@ describe("ConnectionPanel options menu", () => {
     await user.click(within(menu).getByRole("menuitem", { name: /duplicate/i }));
     expect(getConnection).toHaveBeenCalledWith("conn-1");
     expect(saveConnection).toHaveBeenCalledTimes(1);
-    const saved = saveConnection.mock.calls[0][0] as ConnectionConfig;
+    const saved = saveConnection.mock.calls[0][0];
     expect(saved.name).toBe("Local Postgres (copy)");
     expect(saved.id).not.toBe("conn-1");
     expect(saved.password).toBe("secret");
