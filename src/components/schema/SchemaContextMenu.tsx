@@ -1,4 +1,5 @@
-import { useEffect, useRef, useCallback, useState } from "react";
+import { useEffect, useRef, useCallback, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { db } from "@/lib/ipc";
 import { useSchemaStore } from "@/stores/schemaStore";
 import { useTableViewStore } from "@/stores/tableViewStore";
@@ -350,8 +351,10 @@ export function SchemaContextMenu({ target, position, onClose }: Props) {
 
   const items = buildItems();
 
+  let menu: ReactNode;
+
   if (infoDialog) {
-    return (
+    menu = (
       <div
         ref={menuRef}
         className="fixed z-50 min-w-[240px] max-w-[360px] rounded-md border border-border bg-popover shadow-lg"
@@ -375,10 +378,8 @@ export function SchemaContextMenu({ target, position, onClose }: Props) {
         </div>
       </div>
     );
-  }
-
-  if (confirmAction) {
-    return (
+  } else if (confirmAction) {
+    menu = (
       <div
         ref={menuRef}
         className="fixed z-50 min-w-[220px] max-w-[320px] rounded-md border border-border bg-popover p-3 shadow-lg"
@@ -401,29 +402,31 @@ export function SchemaContextMenu({ target, position, onClose }: Props) {
         </div>
       </div>
     );
+  } else {
+    menu = (
+      <div
+        ref={menuRef}
+        className="fixed z-50 min-w-[200px] max-w-[280px] rounded-md border border-border bg-popover py-1 shadow-lg"
+        style={{ left: position.x, top: position.y }}
+      >
+        {items.map((item, i) =>
+          item.separator ? (
+            <div key={i} className="my-1 h-px bg-border" />
+          ) : (
+            <button
+              key={i}
+              onClick={item.action}
+              className={`flex w-full items-center px-3 py-1.5 text-left text-xs hover:bg-accent ${
+                item.danger ? "text-red-500 hover:text-red-400" : "text-foreground"
+              }`}
+            >
+              {item.label}
+            </button>
+          )
+        )}
+      </div>
+    );
   }
 
-  return (
-    <div
-      ref={menuRef}
-      className="fixed z-50 min-w-[200px] max-w-[280px] rounded-md border border-border bg-popover py-1 shadow-lg"
-      style={{ left: position.x, top: position.y }}
-    >
-      {items.map((item, i) =>
-        item.separator ? (
-          <div key={i} className="my-1 h-px bg-border" />
-        ) : (
-          <button
-            key={i}
-            onClick={item.action}
-            className={`flex w-full items-center px-3 py-1.5 text-left text-xs hover:bg-accent ${
-              item.danger ? "text-red-500 hover:text-red-400" : "text-foreground"
-            }`}
-          >
-            {item.label}
-          </button>
-        )
-      )}
-    </div>
-  );
+  return createPortal(menu, document.body);
 }

@@ -44,7 +44,7 @@ export function StatusBar({ updateStatus }: StatusBarProps) {
                 className="h-3.5 w-3.5"
               />
               <span
-                className="h-1.5 w-1.5 rounded-full bg-primary"
+                className="h-1.5 w-1.5 rounded-full bg-emerald-500"
                 aria-hidden
               />
               {active.name}
