@@ -2,6 +2,7 @@ import { ipcMain, dialog, BrowserWindow } from "electron";
 import fs from "node:fs/promises";
 import { IPC } from "./channels";
 import { ConnectionManager } from "../db/ConnectionManager";
+import { DockerManager } from "../docker/DockerManager";
 import {
   loadConnections,
   addOrUpdateConnection,
@@ -26,9 +27,14 @@ import type {
   QueryHistoryEntry,
   SavedQuery,
   ExportRequest,
+  DockerCreateRequest,
 } from "../../shared/types";
+import { findOrphanedDockerConnectionIds } from "../../shared/docker/reconcile";
 
-export function registerIpcHandlers(manager: ConnectionManager): void {
+export function registerIpcHandlers(
+  manager: ConnectionManager,
+  dockerManager: DockerManager = new DockerManager()
+): void {
   // -- Connection management --
   ipcMain.handle(IPC.CONNECTIONS_LIST, async () => {
     const connections = await loadConnections();
@@ -301,4 +307,61 @@ export function registerIpcHandlers(manager: ConnectionManager): void {
       return { success: true, filePath };
     }
   );
+
+  // -- Local Docker instances --
+  ipcMain.handle(IPC.DOCKER_STATUS, async () => {
+    return dockerManager.status();
+  });
+
+  ipcMain.handle(IPC.DOCKER_LIST, async () => {
+    return dockerManager.listManaged();
+  });
+
+  ipcMain.handle(
+    IPC.DOCKER_CREATE,
+    async (_event, request: DockerCreateRequest) => {
+      const { result, connection } = await dockerManager.create(request);
+      await addOrUpdateConnection(connection);
+      return result;
+    }
+  );
+
+  ipcMain.handle(IPC.DOCKER_START, async (_event, containerName: string) => {
+    await dockerManager.start(containerName);
+  });
+
+  ipcMain.handle(IPC.DOCKER_STOP, async (_event, containerName: string) => {
+    await dockerManager.stop(containerName);
+  });
+
+  ipcMain.handle(IPC.DOCKER_DESTROY, async (_event, containerName: string) => {
+    const { connectionId } = await dockerManager.destroy(containerName);
+    if (connectionId) {
+      await removeConnection(connectionId);
+    } else {
+      // Fallback: match by docker.containerName on saved connections
+      const connections = await loadConnections();
+      const linked = connections.find(
+        (c) => c.docker?.containerName === containerName
+      );
+      if (linked) await removeConnection(linked.id);
+    }
+    return { connectionId };
+  });
+
+  ipcMain.handle(IPC.DOCKER_RECONCILE, async () => {
+    const status = await dockerManager.status();
+    // If Docker is down, do not treat every managed connection as orphaned.
+    if (!status.available) {
+      return { removedConnectionIds: [] as string[] };
+    }
+    const managed = await dockerManager.listManaged();
+    const existing = managed.map((c) => c.containerName);
+    const connections = await loadConnections();
+    const orphanIds = findOrphanedDockerConnectionIds(connections, existing);
+    for (const id of orphanIds) {
+      await removeConnection(id);
+    }
+    return { removedConnectionIds: orphanIds };
+  });
 }

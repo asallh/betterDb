@@ -8,6 +8,7 @@ import { StatusBar } from "@/components/layout/StatusBar";
 import { TitleBar } from "@/components/layout/TitleBar";
 import { WelcomeScreen } from "@/components/layout/WelcomeScreen";
 import { ConnectionFormModal } from "@/components/connections/ConnectionFormModal";
+import { DockerCreateModal } from "@/components/connections/DockerCreateModal";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { applyStageTheme } from "@/lib/stageTheme";
 import { updater } from "@/lib/updater";
@@ -21,6 +22,8 @@ export default function App() {
   const connectionFormOpen = useUiStore((s) => s.connectionFormOpen);
   const editingConnectionId = useUiStore((s) => s.editingConnectionId);
   const closeConnectionForm = useUiStore((s) => s.closeConnectionForm);
+  const dockerCreateOpen = useUiStore((s) => s.dockerCreateOpen);
+  const closeDockerCreate = useUiStore((s) => s.closeDockerCreate);
 
   const [updateStatus, setUpdateStatus] = useState<AppUpdateStatus | null>(
     null
@@ -86,6 +89,7 @@ export default function App() {
           onClose={closeConnectionForm}
         />
       )}
+      {dockerCreateOpen && <DockerCreateModal onClose={closeDockerCreate} />}
     </div>
   );
 }

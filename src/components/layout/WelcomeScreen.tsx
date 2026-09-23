@@ -1,9 +1,10 @@
-import { Plus } from "lucide-react";
+import { Plus, Container } from "lucide-react";
 import { AppBrandIcon } from "@/components/brand/AppBrandIcon";
 import { useUiStore } from "@/stores/uiStore";
 
 export function WelcomeScreen() {
   const openConnectionForm = useUiStore((s) => s.openConnectionForm);
+  const openDockerCreate = useUiStore((s) => s.openDockerCreate);
 
   return (
     <div className="relative flex flex-1 items-center justify-center overflow-hidden px-6">
@@ -18,14 +19,24 @@ export function WelcomeScreen() {
           Connect a database to get started.
         </p>
 
-        <button
-          type="button"
-          onClick={() => openConnectionForm()}
-          className="btn-premium mt-8 inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-[13px] font-medium tracking-[-0.01em]"
-        >
-          <Plus className="h-4 w-4" strokeWidth={2.25} />
-          Add connection
-        </button>
+        <div className="mt-8 flex flex-col items-stretch gap-2.5 w-full max-w-[16rem]">
+          <button
+            type="button"
+            onClick={() => openConnectionForm()}
+            className="btn-premium inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-[13px] font-medium tracking-[-0.01em]"
+          >
+            <Plus className="h-4 w-4" strokeWidth={2.25} />
+            Add connection
+          </button>
+          <button
+            type="button"
+            onClick={() => openDockerCreate()}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-border px-5 py-2.5 text-[13px] font-medium tracking-[-0.01em] text-foreground hover:bg-accent transition-colors"
+          >
+            <Container className="h-4 w-4" strokeWidth={2.25} />
+            New local database
+          </button>
+        </div>
       </div>
     </div>
   );
