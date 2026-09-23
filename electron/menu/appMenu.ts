@@ -3,6 +3,12 @@ import {
   appDisplayNameForVersion,
   formatAboutDetail,
 } from "../../shared/version";
+import { updateCheckDialogForStatus } from "../../shared/updateCheckDialog";
+import {
+  checkForUpdatesNow,
+  getAppUpdateStatus,
+  installDownloadedUpdate,
+} from "../updater/autoUpdate";
 
 function showAboutDialog(): void {
   const version = app.getVersion();
@@ -16,7 +22,83 @@ function showAboutDialog(): void {
   });
 }
 
-/** Application menu with File → About so users can see Nightly vs Release. */
+async function showCheckForUpdatesDialog(): Promise<void> {
+  const version = app.getVersion();
+  const name = appDisplayNameForVersion(version);
+  const isPackaged = app.isPackaged;
+
+  if (!isPackaged) {
+    const copy = updateCheckDialogForStatus(
+      { state: "idle", localVersion: version },
+      name,
+      { isPackaged: false }
+    );
+    await dialog.showMessageBox({
+      type: copy.type,
+      title: copy.title,
+      message: copy.message,
+      detail: copy.detail,
+      buttons: ["OK"],
+    });
+    return;
+  }
+
+  // If an update is already downloaded, offer install without re-checking first.
+  const existing = getAppUpdateStatus();
+  if (existing.state === "ready") {
+    const copy = updateCheckDialogForStatus(existing, name);
+    const { response } = await dialog.showMessageBox({
+      type: copy.type,
+      title: copy.title,
+      message: copy.message,
+      detail: copy.detail,
+      buttons: ["Restart and Install", "Later"],
+      defaultId: 0,
+      cancelId: 1,
+    });
+    if (response === 0) {
+      try {
+        installDownloadedUpdate();
+      } catch {
+        // fail-open: dialog already shown
+      }
+    }
+    return;
+  }
+
+  const status = await checkForUpdatesNow();
+  const copy = updateCheckDialogForStatus(status, name);
+
+  if (copy.offerInstall) {
+    const { response } = await dialog.showMessageBox({
+      type: copy.type,
+      title: copy.title,
+      message: copy.message,
+      detail: copy.detail,
+      buttons: ["Restart and Install", "Later"],
+      defaultId: 0,
+      cancelId: 1,
+    });
+    if (response === 0) {
+      try {
+        installDownloadedUpdate();
+      } catch {
+        // fail-open
+      }
+    }
+    return;
+  }
+
+  await dialog.showMessageBox({
+    type: copy.type,
+    title: copy.title,
+    message: copy.message,
+    detail: copy.detail,
+    buttons: ["OK"],
+  });
+}
+
+/** Application menu with About + Check for Updates. */
 export function installAppMenu(): void {
   const version = app.getVersion();
   const name = appDisplayNameForVersion(version);
@@ -24,6 +106,12 @@ export function installAppMenu(): void {
   const aboutItem: MenuItemConstructorOptions = {
     label: `About ${name}`,
     click: showAboutDialog,
+  };
+  const checkUpdatesItem: MenuItemConstructorOptions = {
+    label: "Check for Updates…",
+    click: () => {
+      void showCheckForUpdatesDialog();
+    },
   };
 
   const template: MenuItemConstructorOptions[] = [
@@ -33,6 +121,7 @@ export function installAppMenu(): void {
             label: name,
             submenu: [
               aboutItem,
+              checkUpdatesItem,
               { type: "separator" as const },
               { role: "services" as const },
               { type: "separator" as const },
@@ -49,6 +138,7 @@ export function installAppMenu(): void {
       label: "File",
       submenu: [
         aboutItem,
+        checkUpdatesItem,
         { type: "separator" },
         isMac ? { role: "close" } : { role: "quit" },
       ],
@@ -98,6 +188,10 @@ export function installAppMenu(): void {
           ? [{ type: "separator" as const }, { role: "front" as const }]
           : [{ role: "close" as const }]),
       ],
+    },
+    {
+      label: "Help",
+      submenu: [checkUpdatesItem, { type: "separator" }, aboutItem],
     },
   ];
 
