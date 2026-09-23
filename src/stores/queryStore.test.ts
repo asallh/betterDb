@@ -1,5 +1,29 @@
-import { beforeEach, describe, expect, it } from "vitest";
-import { useQueryStore } from "./queryStore";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  _resetSchemaRefreshTimerForTests,
+  useQueryStore,
+} from "./queryStore";
+
+const executeQuery = vi.fn();
+const refreshAll = vi.fn().mockResolvedValue(undefined);
+
+vi.mock("@/lib/ipc", () => ({
+  db: {
+    executeQuery: (...args: unknown[]) => executeQuery(...args),
+  },
+}));
+
+vi.mock("./connectionStore", () => ({
+  useConnectionStore: {
+    getState: () => ({ activeConnectionId: "conn-1" }),
+  },
+}));
+
+vi.mock("./schemaStore", () => ({
+  useSchemaStore: {
+    getState: () => ({ refreshAll }),
+  },
+}));
 
 function resetStore() {
   const tab = {
@@ -16,6 +40,15 @@ function resetStore() {
 describe("queryStore", () => {
   beforeEach(() => {
     resetStore();
+    _resetSchemaRefreshTimerForTests();
+    executeQuery.mockReset();
+    refreshAll.mockClear();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    _resetSchemaRefreshTimerForTests();
+    vi.useRealTimers();
   });
 
   it("addTab appends and activates a new query tab", () => {
@@ -80,5 +113,75 @@ describe("queryStore", () => {
 
     useQueryStore.getState().setTabColor(id, null);
     expect(useQueryStore.getState().tabs[0].color).toBeNull();
+  });
+
+  describe("executeQuery schema refresh (#54)", () => {
+    const okResult = {
+      columns: [],
+      rows: [],
+      rowCount: 0,
+      durationMs: 1,
+    };
+
+    it("refreshes schema after a successful DDL query", async () => {
+      executeQuery.mockResolvedValue(okResult);
+      const id = useQueryStore.getState().activeTabId;
+      useQueryStore.getState().updateSQL(id, "CREATE TABLE foo (id int)");
+
+      await useQueryStore.getState().executeQuery(id);
+      expect(refreshAll).not.toHaveBeenCalled();
+
+      await vi.advanceTimersByTimeAsync(300);
+      expect(refreshAll).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not refresh after a successful SELECT", async () => {
+      executeQuery.mockResolvedValue(okResult);
+      const id = useQueryStore.getState().activeTabId;
+      useQueryStore.getState().updateSQL(id, "SELECT * FROM users");
+
+      await useQueryStore.getState().executeQuery(id);
+      await vi.advanceTimersByTimeAsync(300);
+      expect(refreshAll).not.toHaveBeenCalled();
+    });
+
+    it("does not refresh when the result has an error", async () => {
+      executeQuery.mockResolvedValue({ ...okResult, error: "syntax error" });
+      const id = useQueryStore.getState().activeTabId;
+      useQueryStore.getState().updateSQL(id, "CREATE TABLE foo (id int)");
+
+      await useQueryStore.getState().executeQuery(id);
+      await vi.advanceTimersByTimeAsync(300);
+      expect(refreshAll).not.toHaveBeenCalled();
+    });
+
+    it("does not refresh when executeQuery throws", async () => {
+      executeQuery.mockRejectedValue(new Error("connection lost"));
+      const id = useQueryStore.getState().activeTabId;
+      useQueryStore.getState().updateSQL(id, "DROP TABLE foo");
+
+      await useQueryStore.getState().executeQuery(id);
+      await vi.advanceTimersByTimeAsync(300);
+      expect(refreshAll).not.toHaveBeenCalled();
+      expect(useQueryStore.getState().tabs[0].result?.error).toBe(
+        "connection lost"
+      );
+    });
+
+    it("debounces rapid DDL executions into a single refresh", async () => {
+      executeQuery.mockResolvedValue(okResult);
+      const id = useQueryStore.getState().activeTabId;
+
+      useQueryStore.getState().updateSQL(id, "CREATE TABLE a (id int)");
+      await useQueryStore.getState().executeQuery(id);
+      useQueryStore.getState().updateSQL(id, "CREATE TABLE b (id int)");
+      await useQueryStore.getState().executeQuery(id);
+      useQueryStore.getState().updateSQL(id, "CREATE INDEX idx ON a (id)");
+      await useQueryStore.getState().executeQuery(id);
+
+      expect(refreshAll).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(300);
+      expect(refreshAll).toHaveBeenCalledTimes(1);
+    });
   });
 });
