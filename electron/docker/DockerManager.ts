@@ -25,6 +25,7 @@ import {
 } from "../../shared/docker/presets";
 import { buildDockerConnectionConfig } from "../../shared/docker/buildConnection";
 import { mapDockerError } from "../../shared/docker/errors";
+import { waitForDatabaseReady } from "./waitForReady";
 
 function resolveDockerSocketPath(): string | undefined {
   if (process.env.DOCKER_HOST?.startsWith("unix://")) {
@@ -86,28 +87,6 @@ async function findFreePort(preferred: number): Promise<number> {
   }
   throw new Error(
     `Could not find a free host port near ${preferred}. Specify a free port manually.`
-  );
-}
-
-async function waitForTcp(
-  port: number,
-  host = "127.0.0.1",
-  attempts = 90,
-  delayMs = 500
-): Promise<void> {
-  for (let i = 0; i < attempts; i++) {
-    const ok = await new Promise<boolean>((resolve) => {
-      const socket = net.connect({ port, host }, () => {
-        socket.end();
-        resolve(true);
-      });
-      socket.on("error", () => resolve(false));
-    });
-    if (ok) return;
-    await new Promise((r) => setTimeout(r, delayMs));
-  }
-  throw new Error(
-    `Database container started but did not accept connections on port ${port} in time.`
   );
 }
 
@@ -318,7 +297,14 @@ export class DockerManager {
       });
 
       await container.start();
-      await waitForTcp(hostPort);
+      await waitForDatabaseReady({
+        engine: request.engine,
+        host: "127.0.0.1",
+        port: hostPort,
+        user,
+        password,
+        database,
+      });
 
       const connection = buildDockerConnectionConfig({
         connectionId,

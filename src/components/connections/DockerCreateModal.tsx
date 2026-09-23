@@ -97,6 +97,11 @@ export function DockerCreateModal({ onClose }: Props) {
       });
       await loadConnections();
       await connect(result.connectionId);
+      const connectError = useConnectionStore.getState().error;
+      if (connectError) {
+        setFormError(connectError);
+        return;
+      }
       onClose();
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Failed to create container");
