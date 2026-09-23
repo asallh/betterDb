@@ -25,6 +25,21 @@ const connections: ConnectionConfig[] = [
     user: "app",
     password: "",
   },
+  {
+    id: "conn-docker",
+    name: "Docker Postgres",
+    engine: "postgres",
+    host: "localhost",
+    port: 5433,
+    database: "postgres",
+    user: "postgres",
+    password: "",
+    docker: {
+      managed: true,
+      containerName: "betterdb-docker-postgres",
+      volumeName: "betterdb-docker-postgres-data",
+    },
+  },
 ];
 
 const connect = vi.fn<(id: string) => Promise<void>>(async () => undefined);
@@ -59,6 +74,7 @@ vi.mock("@/stores/connectionStore", () => ({
       disconnect,
       deleteConnection,
       saveConnection,
+      loadConnections: vi.fn(async () => undefined),
     }),
 }));
 
@@ -66,12 +82,20 @@ vi.mock("@/stores/uiStore", () => ({
   useUiStore: (selector: (s: Record<string, unknown>) => unknown) =>
     selector({
       openConnectionForm,
+      openDockerCreate: vi.fn(),
     }),
 }));
 
 vi.mock("@/lib/ipc", () => ({
   db: {
     getConnection: (id: string) => getConnection(id),
+  },
+  docker: {
+    list: async () => [],
+    reconcile: async () => ({ removedConnectionIds: [] }),
+    start: async () => undefined,
+    stop: async () => undefined,
+    destroy: async () => ({ connectionId: null }),
   },
 }));
 
@@ -156,5 +180,19 @@ describe("ConnectionPanel options menu", () => {
     await openMenuFor("Local Postgres");
     const menu = screen.getByRole("menu");
     expect(menu.parentElement).toBe(document.body);
+  });
+
+  it("shows Destroy container only for Docker-managed connections", async () => {
+    const { menu: dockerMenu } = await openMenuFor("Docker Postgres");
+    expect(
+      within(dockerMenu).getByRole("menuitem", { name: /destroy container/i })
+    ).toBeInTheDocument();
+  });
+
+  it("hides Destroy container for non-Docker connections", async () => {
+    const { menu } = await openMenuFor("Staging");
+    expect(
+      within(menu).queryByRole("menuitem", { name: /destroy container/i })
+    ).not.toBeInTheDocument();
   });
 });

@@ -176,6 +176,10 @@ export class MongoAdapter extends DatabaseAdapter {
         params.set("tlsAllowInvalidCertificates", "true");
       }
     }
+    // Docker official mongo image creates the root user in the admin DB.
+    if (this.config.docker?.managed && this.config.user) {
+      params.set("authSource", "admin");
+    }
 
     const query = params.toString() ? `?${params.toString()}` : "";
 

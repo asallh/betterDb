@@ -2,7 +2,8 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useConnectionStore } from "@/stores/connectionStore";
 import { useUiStore } from "@/stores/uiStore";
-import { db } from "@/lib/ipc";
+import { db, docker } from "@/lib/ipc";
+import type { DockerManagedContainer } from "../../../shared/types";
 import { DatabaseEngineIcon } from "@/components/icons/DatabaseIcons";
 import { buildDuplicatedConnection } from "./duplicateConnection";
 import {
@@ -13,24 +14,37 @@ import {
   Loader2,
   MoreVertical,
   Copy,
+  Play,
+  Square,
+  Container,
 } from "lucide-react";
 
 function ConnectionMenu({
   isActive,
+  isDockerManaged,
+  dockerState,
   onConnect,
   onDisconnect,
   onDuplicate,
   onEdit,
   onDelete,
+  onStartContainer,
+  onStopContainer,
+  onDestroyContainer,
   onClose,
   anchorRef,
 }: {
   isActive: boolean;
+  isDockerManaged: boolean;
+  dockerState: DockerManagedContainer["state"] | null;
   onConnect: () => void;
   onDisconnect: () => void;
   onDuplicate: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onStartContainer: () => void;
+  onStopContainer: () => void;
+  onDestroyContainer: () => void;
   onClose: () => void;
   anchorRef: React.RefObject<HTMLButtonElement | null>;
 }) {
@@ -66,7 +80,6 @@ function ConnectionMenu({
     };
   }, [onClose, anchorRef]);
 
-  // Clamp so the menu stays in the viewport
   useEffect(() => {
     if (!menuRef.current || !pos) return;
     const rect = menuRef.current.getBoundingClientRect();
@@ -88,6 +101,10 @@ function ConnectionMenu({
 
   const itemClass =
     "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs hover:bg-accent transition-colors";
+
+  const showStart =
+    isDockerManaged && dockerState !== null && dockerState !== "running";
+  const showStop = isDockerManaged && dockerState === "running";
 
   const menu = (
     <div
@@ -121,6 +138,32 @@ function ConnectionMenu({
           Connect
         </button>
       )}
+      {showStart && (
+        <button
+          role="menuitem"
+          onClick={() => {
+            onStartContainer();
+            onClose();
+          }}
+          className={itemClass}
+        >
+          <Play className="h-3 w-3" />
+          Start container
+        </button>
+      )}
+      {showStop && (
+        <button
+          role="menuitem"
+          onClick={() => {
+            onStopContainer();
+            onClose();
+          }}
+          className={itemClass}
+        >
+          <Square className="h-3 w-3" />
+          Stop container
+        </button>
+      )}
       <button
         role="menuitem"
         onClick={() => {
@@ -143,6 +186,19 @@ function ConnectionMenu({
         <Pencil className="h-3 w-3" />
         Edit
       </button>
+      {isDockerManaged && (
+        <button
+          role="menuitem"
+          onClick={() => {
+            onDestroyContainer();
+            onClose();
+          }}
+          className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-destructive hover:bg-destructive/10 transition-colors"
+        >
+          <Container className="h-3 w-3" />
+          Destroy container
+        </button>
+      )}
       <button
         role="menuitem"
         onClick={() => {
@@ -227,20 +283,130 @@ function ConfirmDeleteDialog({
   );
 }
 
+function ConfirmDestroyDialog({
+  connName,
+  containerName,
+  onConfirm,
+  onCancel,
+}: {
+  connName: string;
+  containerName: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (
+        dialogRef.current &&
+        !dialogRef.current.contains(e.target as Node)
+      ) {
+        onCancel();
+      }
+    }
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onCancel();
+    }
+    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [onCancel]);
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-[2px]">
+      <div
+        ref={dialogRef}
+        className="mx-4 w-full max-w-sm rounded-2xl border border-border/80 bg-card p-5 shadow-[0_16px_48px_hsl(0_0%_0%/0.28)]"
+        role="dialog"
+        aria-labelledby="destroy-container-title"
+      >
+        <h3 id="destroy-container-title" className="text-sm font-semibold">
+          Destroy local database
+        </h3>
+        <p className="mt-2 text-xs text-muted-foreground">
+          This removes the Docker container{" "}
+          <span className="font-mono text-foreground">{containerName}</span>,
+          its data volume, and the saved connection{" "}
+          <span className="font-medium text-foreground">{connName}</span>. This
+          cannot be undone.
+        </p>
+        <div className="mt-4 flex justify-end gap-2">
+          <button
+            onClick={onCancel}
+            className="rounded-md border border-border px-3 py-1.5 text-xs hover:bg-accent transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="rounded-md bg-destructive px-3 py-1.5 text-xs text-destructive-foreground hover:bg-destructive/90 transition-colors"
+          >
+            Destroy
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 export function ConnectionPanel() {
   const connections = useConnectionStore((s) => s.connections);
   const connect = useConnectionStore((s) => s.connect);
   const disconnect = useConnectionStore((s) => s.disconnect);
   const deleteConnection = useConnectionStore((s) => s.deleteConnection);
   const saveConnection = useConnectionStore((s) => s.saveConnection);
+  const loadConnections = useConnectionStore((s) => s.loadConnections);
   const activeConnectionId = useConnectionStore((s) => s.activeConnectionId);
   const isConnecting = useConnectionStore((s) => s.isConnecting);
   const error = useConnectionStore((s) => s.error);
   const openConnectionForm = useUiStore((s) => s.openConnectionForm);
+  const openDockerCreate = useUiStore((s) => s.openDockerCreate);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const menuButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const [confirmDeleteConn, setConfirmDeleteConn] =
     useState<{ id: string; name: string } | null>(null);
+  const [confirmDestroy, setConfirmDestroy] = useState<{
+    id: string;
+    name: string;
+    containerName: string;
+  } | null>(null);
+  const [dockerByName, setDockerByName] = useState<
+    Record<string, DockerManagedContainer>
+  >({});
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const refreshDocker = useCallback(async () => {
+    try {
+      // Use getState so this callback stays stable across renders.
+      await useConnectionStore.getState().loadConnections();
+      const list = await docker.list();
+      const map: Record<string, DockerManagedContainer> = {};
+      for (const c of list) map[c.containerName] = c;
+      setDockerByName(map);
+    } catch {
+      // Docker may be unavailable; leave map empty
+      setDockerByName({});
+    }
+  }, []);
+
+  const connectionIds = connections.map((c) => c.id).join(",");
+
+  useEffect(() => {
+    void refreshDocker();
+  }, [refreshDocker, connectionIds]);
+
+  useEffect(() => {
+    function onFocus() {
+      void refreshDocker();
+    }
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [refreshDocker]);
 
   const handleDuplicate = useCallback(
     async (id: string) => {
@@ -250,17 +416,84 @@ export function ConnectionPanel() {
     [saveConnection]
   );
 
+  const handleStart = useCallback(
+    async (containerName: string) => {
+      setActionError(null);
+      try {
+        await docker.start(containerName);
+        await refreshDocker();
+      } catch (e) {
+        setActionError(e instanceof Error ? e.message : "Failed to start container");
+      }
+    },
+    [refreshDocker]
+  );
+
+  const handleStop = useCallback(
+    async (containerName: string) => {
+      setActionError(null);
+      try {
+        await docker.stop(containerName);
+        await refreshDocker();
+      } catch (e) {
+        setActionError(e instanceof Error ? e.message : "Failed to stop container");
+      }
+    },
+    [refreshDocker]
+  );
+
+  const handleDestroy = useCallback(
+    async (containerName: string, connectionId: string) => {
+      setActionError(null);
+      try {
+        if (activeConnectionId === connectionId) {
+          await disconnect();
+        }
+        await docker.destroy(containerName);
+        await loadConnections();
+        await refreshDocker();
+      } catch (e) {
+        setActionError(
+          e instanceof Error ? e.message : "Failed to destroy container"
+        );
+      }
+    },
+    [activeConnectionId, disconnect, loadConnections, refreshDocker]
+  );
+
   return (
     <div className="max-h-80 overflow-auto">
-      {error && (
+      {(error || actionError) && (
         <div className="mx-2 mt-2 rounded border border-destructive/50 bg-destructive/10 px-2 py-1 text-[11px] text-destructive">
-          {error}
+          {actionError ?? error}
         </div>
       )}
+
+      <div className="flex items-center gap-1 px-2 pt-1.5">
+        <button
+          type="button"
+          onClick={() => openConnectionForm()}
+          className="flex-1 rounded-md px-2 py-1 text-[10px] font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+        >
+          Add connection
+        </button>
+        <button
+          type="button"
+          onClick={() => openDockerCreate()}
+          className="flex-1 rounded-md px-2 py-1 text-[10px] font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+        >
+          New local DB
+        </button>
+      </div>
 
       <div className="p-1.5 space-y-0.5">
         {connections.map((conn) => {
           const isActive = conn.id === activeConnectionId;
+          const isDocker = Boolean(conn.docker?.managed);
+          const containerName = conn.docker?.containerName;
+          const dockerInfo = containerName
+            ? dockerByName[containerName]
+            : undefined;
           return (
             <div
               key={conn.id}
@@ -282,7 +515,26 @@ export function ConnectionPanel() {
                 }`}
               />
               <div className="flex flex-1 flex-col min-w-0">
-                <span className="font-medium truncate">{conn.name}</span>
+                <span className="font-medium truncate flex items-center gap-1.5">
+                  {conn.name}
+                  {isDocker && (
+                    <span
+                      className="inline-flex items-center gap-0.5 rounded bg-muted px-1 py-px text-[9px] font-medium text-muted-foreground"
+                      title={
+                        dockerInfo
+                          ? `Docker: ${dockerInfo.state}`
+                          : "Docker-managed"
+                      }
+                    >
+                      <Container className="h-2.5 w-2.5" />
+                      {dockerInfo?.state === "running"
+                        ? "up"
+                        : dockerInfo
+                          ? dockerInfo.state
+                          : "docker"}
+                    </span>
+                  )}
+                </span>
                 <span className="text-[10px] text-muted-foreground truncate">
                   {conn.host}:{conn.port}/{conn.database}
                 </span>
@@ -333,6 +585,8 @@ export function ConnectionPanel() {
               {menuOpenId === conn.id && menuButtonRefs.current[conn.id] && (
                 <ConnectionMenu
                   isActive={isActive}
+                  isDockerManaged={isDocker}
+                  dockerState={dockerInfo?.state ?? null}
                   onConnect={() => connect(conn.id)}
                   onDisconnect={() => disconnect()}
                   onDuplicate={() => {
@@ -342,6 +596,21 @@ export function ConnectionPanel() {
                   onDelete={() =>
                     setConfirmDeleteConn({ id: conn.id, name: conn.name })
                   }
+                  onStartContainer={() => {
+                    if (containerName) void handleStart(containerName);
+                  }}
+                  onStopContainer={() => {
+                    if (containerName) void handleStop(containerName);
+                  }}
+                  onDestroyContainer={() => {
+                    if (containerName) {
+                      setConfirmDestroy({
+                        id: conn.id,
+                        name: conn.name,
+                        containerName,
+                      });
+                    }
+                  }}
                   onClose={() => setMenuOpenId(null)}
                   anchorRef={{
                     current: menuButtonRefs.current[conn.id],
@@ -367,6 +636,21 @@ export function ConnectionPanel() {
             setConfirmDeleteConn(null);
           }}
           onCancel={() => setConfirmDeleteConn(null)}
+        />
+      )}
+
+      {confirmDestroy && (
+        <ConfirmDestroyDialog
+          connName={confirmDestroy.name}
+          containerName={confirmDestroy.containerName}
+          onConfirm={() => {
+            void handleDestroy(
+              confirmDestroy.containerName,
+              confirmDestroy.id
+            );
+            setConfirmDestroy(null);
+          }}
+          onCancel={() => setConfirmDestroy(null)}
         />
       )}
     </div>

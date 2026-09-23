@@ -41,4 +41,12 @@ export const IPC = {
   UPDATER_CHECK: "updater:check",
   UPDATER_INSTALL: "updater:install",
   UPDATER_OPEN_RELEASE: "updater:openRelease",
+
+  DOCKER_STATUS: "docker:status",
+  DOCKER_LIST: "docker:list",
+  DOCKER_CREATE: "docker:create",
+  DOCKER_START: "docker:start",
+  DOCKER_STOP: "docker:stop",
+  DOCKER_DESTROY: "docker:destroy",
+  DOCKER_RECONCILE: "docker:reconcile",
 } as const;

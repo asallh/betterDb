@@ -46,6 +46,7 @@ export function Sidebar() {
   const setPanelOpen = useUiStore((s) => s.setConnectionsPanelOpen);
   const openConnectionsPanel = useUiStore((s) => s.openConnectionsPanel);
   const openConnectionForm = useUiStore((s) => s.openConnectionForm);
+  const openDockerCreate = useUiStore((s) => s.openDockerCreate);
   const [width, setWidth] = useState(DEFAULT_WIDTH);
   const [collapsed, setCollapsed] = useState(false);
   const [contentVisible, setContentVisible] = useState(true);
@@ -303,6 +304,13 @@ export function Sidebar() {
                       className="mt-1 text-[11px] font-medium text-primary transition-colors hover:text-primary/80"
                     >
                       Add connection
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openDockerCreate()}
+                      className="text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      New local database
                     </button>
                   </>
                 )}

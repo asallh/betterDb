@@ -37,4 +37,19 @@ describe("buildDuplicatedConnection", () => {
     expect(dup.id).not.toBe(source.id);
     expect(dup.name).toBe("Prod DB (copy)");
   });
+
+  it("strips docker metadata so copies do not share a managed container", () => {
+    const managed: ConnectionConfig = {
+      ...source,
+      docker: {
+        managed: true,
+        containerName: "betterdb-prod-db",
+        volumeName: "betterdb-prod-db-data",
+      },
+    };
+    const dup = buildDuplicatedConnection(managed, "conn-4");
+    expect(dup.docker).toBeUndefined();
+    expect(dup.id).toBe("conn-4");
+    expect(dup.name).toBe("Prod DB (copy)");
+  });
 });

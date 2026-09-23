@@ -49,6 +49,44 @@ export interface ConnectionConfig {
   filePath?: string;
   /** Optional full connection / JDBC-style string. */
   connectionString?: string;
+  /** Present when this connection was created from a BetterDB-managed Docker container. */
+  docker?: {
+    managed: true;
+    containerName: string;
+    volumeName?: string;
+  };
+}
+
+/** Engines that support one-click local Docker instances (v1). */
+export type DockerLocalEngine = "postgres" | "mysql" | "redis" | "mongodb";
+
+export interface DockerCreateRequest {
+  engine: DockerLocalEngine;
+  name: string;
+  port?: number;
+  user?: string;
+  password?: string;
+  database?: string;
+}
+
+export interface DockerStatus {
+  available: boolean;
+  error?: string;
+}
+
+export interface DockerManagedContainer {
+  containerName: string;
+  containerId: string;
+  engine: string;
+  connectionId: string | null;
+  state: "running" | "exited" | "created" | "paused" | "restarting" | "removing" | "dead" | "unknown";
+  ports: number[];
+}
+
+export interface DockerCreateResult {
+  connectionId: string;
+  containerName: string;
+  port: number;
 }
 
 export interface TableInfo {
