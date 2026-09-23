@@ -25,4 +25,9 @@ describe("Nightly workflow OTA contract", () => {
     );
     expect(nightlyWorkflow).toMatch(/channel:\s*"nightly"/);
   });
+
+  it("supports workflow_dispatch force rebuild for broken OTA publishes", () => {
+    expect(nightlyWorkflow).toMatch(/inputs:\s*\n\s*force:/);
+    expect(nightlyWorkflow).toMatch(/FORCE:\s*\$\{\{\s*github\.event_name == 'workflow_dispatch' && inputs\.force == true\s*\}\}/);
+  });
 });

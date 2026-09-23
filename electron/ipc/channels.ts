@@ -38,6 +38,7 @@ export const IPC = {
   EXPORT_DATA: "db:export",
 
   UPDATER_GET_STATUS: "updater:getStatus",
+  UPDATER_CHECK: "updater:check",
   UPDATER_INSTALL: "updater:install",
   UPDATER_OPEN_RELEASE: "updater:openRelease",
 } as const;

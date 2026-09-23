@@ -6,6 +6,11 @@ on:
     # always keep this file in sync via the release pipeline.
     - cron: "0 6 * * *"
   workflow_dispatch:
+    inputs:
+      force:
+        description: Rebuild even if HEAD matches the latest nightly tag (republish OTA feeds)
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -29,6 +34,8 @@ jobs:
 
       - name: Decide whether to build
         id: decide
+        env:
+          FORCE: ${{ github.event_name == 'workflow_dispatch' && inputs.force == true }}
         shell: bash
         run: |
           set -euo pipefail
@@ -107,11 +114,14 @@ jobs:
           if [ -n "$LAST_NIGHTLY" ]; then
             LAST_COMMIT=$(git rev-list -n 1 "$LAST_NIGHTLY")
             echo "Last nightly tag: $LAST_NIGHTLY @ $LAST_COMMIT"
-            if [ "$LAST_COMMIT" = "$HEAD_SHA" ]; then
+            if [ "$LAST_COMMIT" = "$HEAD_SHA" ] && [ "$FORCE" != "true" ]; then
               echo "No new commits on dev since last nightly"
               echo "should_build=false" >> "$GITHUB_OUTPUT"
               echo "version=" >> "$GITHUB_OUTPUT"
               exit 0
+            fi
+            if [ "$LAST_COMMIT" = "$HEAD_SHA" ] && [ "$FORCE" = "true" ]; then
+              echo "Force rebuild of nightly at $HEAD_SHA"
             fi
           else
             echo "No previous nightly tags found"
@@ -123,8 +133,12 @@ jobs:
           VERSION="${BASE}-nightly.${DATE}.${SHORT_SHA}"
 
           if git rev-parse "v${VERSION}" >/dev/null 2>&1; then
-            echo "::error::Tag v${VERSION} already exists"
-            exit 1
+            if [ "$FORCE" = "true" ]; then
+              echo "Force rebuild: tag v${VERSION} already exists; publish will clobber assets"
+            else
+              echo "::error::Tag v${VERSION} already exists"
+              exit 1
+            fi
           fi
 
           echo "Building nightly version ${VERSION} at ${HEAD_SHA}"

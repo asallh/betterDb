@@ -28,11 +28,16 @@ vi.mock("@/stores/queryStore", () => ({
 
 const install = vi.fn<() => Promise<void>>(async () => undefined);
 const openRelease = vi.fn<() => Promise<void>>(async () => undefined);
+const check = vi.fn<() => Promise<unknown>>(async () => ({
+  state: "idle",
+  localVersion: "0.1.0",
+}));
 
 vi.mock("@/lib/updater", () => ({
   updater: {
     install: () => install(),
     openRelease: () => openRelease(),
+    check: () => check(),
   },
 }));
 
@@ -69,7 +74,8 @@ describe("StatusBar update indicator", () => {
     expect(screen.getByText(/Downloading update… 42%/)).toBeInTheDocument();
   });
 
-  it("shows update check failed on error", () => {
+  it("retries update check when error indicator is clicked", async () => {
+    const user = userEvent.setup();
     render(
       <StatusBar
         updateStatus={{
@@ -79,6 +85,8 @@ describe("StatusBar update indicator", () => {
         }}
       />
     );
-    expect(screen.getByText("Update check failed")).toBeInTheDocument();
+    const button = screen.getByRole("button", { name: /update check failed/i });
+    await user.click(button);
+    expect(check).toHaveBeenCalledTimes(1);
   });
 });
