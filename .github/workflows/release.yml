@@ -68,12 +68,18 @@ jobs:
               | .[0].head.ref // empty
             ')
             if [ -z "$head_ref" ]; then
-              # Squash merges still associate; if none, try message "(#N)".
+              # Squash merges usually associate via the commits API; if not, try
+              # message "(#N)" but only when this SHA is that PR's merge commit
+              # (avoids triggering a release from an unrelated push that cites
+              # an old dev→main PR number).
               pr_num=$(git log -1 --pretty=%B | grep -oE '#[0-9]+' | head -1 | tr -d '#' || true)
               if [ -n "$pr_num" ]; then
-                head_ref=$(gh pr view "$pr_num" --repo "$GH_REPO" --json headRefName -q .headRefName || true)
-                base_ref=$(gh pr view "$pr_num" --repo "$GH_REPO" --json baseRefName -q .baseRefName || true)
-                if [ "$base_ref" != "main" ]; then
+                pr_meta=$(gh pr view "$pr_num" --repo "$GH_REPO" \
+                  --json headRefName,baseRefName,mergeCommit || true)
+                head_ref=$(echo "$pr_meta" | jq -r '.headRefName // empty')
+                base_ref=$(echo "$pr_meta" | jq -r '.baseRefName // empty')
+                merge_sha=$(echo "$pr_meta" | jq -r '.mergeCommit.oid // empty')
+                if [ "$base_ref" != "main" ] || [ "$merge_sha" != "$SHA" ]; then
                   head_ref=""
                 fi
               fi

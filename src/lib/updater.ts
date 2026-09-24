@@ -4,6 +4,8 @@ import { UPDATER_STATUS_EVENT } from "../../shared/updateStatus";
 export const updater = {
   getStatus: (): Promise<AppUpdateStatus> =>
     window.ipcRenderer.invoke("updater:getStatus"),
+  check: (): Promise<AppUpdateStatus> =>
+    window.ipcRenderer.invoke("updater:check"),
   install: (): Promise<void> => window.ipcRenderer.invoke("updater:install"),
   openRelease: (): Promise<void> =>
     window.ipcRenderer.invoke("updater:openRelease"),

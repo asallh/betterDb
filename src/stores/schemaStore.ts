@@ -64,8 +64,8 @@ export const useSchemaStore = create<SchemaStore>((set, get) => ({
   },
 
   refreshAll: async () => {
-    const { loadSchemas, loadTables, schemas } = get();
-    await loadSchemas();
+    await get().loadSchemas();
+    const { schemas, loadTables } = get();
     for (const schema of schemas) {
       await loadTables(schema);
     }

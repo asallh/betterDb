@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { ConnectionConfig } from "../../shared/types";
-import { db } from "@/lib/ipc";
+import { db, docker } from "@/lib/ipc";
 
 interface ConnectionStore {
   connections: ConnectionConfig[];
@@ -25,6 +25,18 @@ export const useConnectionStore = create<ConnectionStore>((set, get) => ({
   error: null,
 
   loadConnections: async () => {
+    try {
+      const { removedConnectionIds } = await docker.reconcile();
+      const { activeConnectionId } = get();
+      if (
+        activeConnectionId &&
+        removedConnectionIds.includes(activeConnectionId)
+      ) {
+        await get().disconnect();
+      }
+    } catch {
+      // Docker/reconcile unavailable — still load saved connections
+    }
     const connections = await db.listConnections();
     set({ connections });
   },

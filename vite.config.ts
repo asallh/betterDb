@@ -52,6 +52,7 @@ export default defineConfig(({ command }) => {
                   '@clickhouse/client',
                   '@google-cloud/bigquery',
                   'electron-updater',
+                  'dockerode',
                 ],
               },
             },

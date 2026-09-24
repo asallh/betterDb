@@ -3,6 +3,7 @@ import { app, type BrowserWindow } from "electron";
 import electronUpdater from "electron-updater";
 import {
   UPDATER_STATUS_EVENT,
+  allowPrereleaseForVersion,
   githubReleaseUrl,
   updaterChannelForVersion,
   type AppUpdateStatus,
@@ -60,7 +61,7 @@ export function configureAutoUpdater(options: {
   const channel = updaterChannelForVersion(localVersion);
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
-  autoUpdater.allowPrerelease = true;
+  autoUpdater.allowPrerelease = allowPrereleaseForVersion(localVersion);
   autoUpdater.channel = channel;
 
   autoUpdater.on("checking-for-update", () => {
@@ -111,18 +112,52 @@ export function configureAutoUpdater(options: {
   });
 }
 
+function runUpdateCheck(): Promise<AppUpdateStatus> {
+  const localVersion = app.getVersion();
+  return autoUpdater
+    .checkForUpdates()
+    .then(() => currentStatus)
+    .catch((err: unknown) => {
+      const status: AppUpdateStatus = {
+        state: "error",
+        localVersion,
+        message: err instanceof Error ? err.message : "Update check failed",
+      };
+      // Prefer the error event payload when it already fired.
+      if (currentStatus.state !== "error") {
+        broadcast(status);
+      }
+      return currentStatus;
+    });
+}
+
 /** Fire-and-forget check; fail-open (errors surface via status). */
 export function startAutoUpdateCheck(): void {
   if (!app.isPackaged) {
     return;
   }
-  void autoUpdater.checkForUpdates().catch((err: unknown) => {
-    broadcast({
+  void runUpdateCheck();
+}
+
+/**
+ * User-initiated check (menu / status bar). Returns the status after the
+ * network check settles. No-op status in unpackaged/dev builds.
+ */
+export async function checkForUpdatesNow(): Promise<AppUpdateStatus> {
+  const localVersion = app.getVersion();
+  if (!app.isPackaged) {
+    return { state: "idle", localVersion };
+  }
+  if (!configured) {
+    const status: AppUpdateStatus = {
       state: "error",
-      localVersion: app.getVersion(),
-      message: err instanceof Error ? err.message : "Update check failed",
-    });
-  });
+      localVersion,
+      message: "Updater is not configured",
+    };
+    broadcast(status);
+    return status;
+  }
+  return runUpdateCheck();
 }
 
 /** Apply a downloaded update (restarts the app). */

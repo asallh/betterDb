@@ -3,6 +3,7 @@ import {
   DATABASE_ENGINE_ORDER,
   DATABASE_ENGINES,
   engineFromScheme,
+  getDefaultDatabase,
   getDefaultPort,
   getEngineKind,
   getQueryLanguage,
@@ -29,6 +30,8 @@ describe("databaseEngines", () => {
     expect(getDefaultPort("postgres")).toBe(5432);
     expect(getDefaultPort("redis")).toBe(6379);
     expect(getDefaultPort("sqlserver")).toBe(1433);
+    expect(getDefaultDatabase("databricks")).toBe("databricks_postgres");
+    expect(DATABASE_ENGINES.databricks.label).toBe("Databricks Lakebase");
     expect(requiresHost("sqlite")).toBe(false);
     expect(requiresHost("mongodb")).toBe(true);
   });

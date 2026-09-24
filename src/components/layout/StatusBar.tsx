@@ -20,6 +20,14 @@ export function StatusBar({ updateStatus }: StatusBarProps) {
   const result = activeTab?.result;
 
   async function onUpdateClick() {
+    if (updateStatus?.state === "error") {
+      try {
+        await updater.check();
+      } catch {
+        // fail-open: leave the indicator visible
+      }
+      return;
+    }
     if (updateStatus?.state !== "ready") return;
     try {
       await updater.install();
@@ -44,7 +52,7 @@ export function StatusBar({ updateStatus }: StatusBarProps) {
                 className="h-3.5 w-3.5"
               />
               <span
-                className="h-1.5 w-1.5 rounded-full bg-primary"
+                className="h-1.5 w-1.5 rounded-full bg-emerald-500"
                 aria-hidden
               />
               {active.name}
@@ -86,12 +94,14 @@ export function StatusBar({ updateStatus }: StatusBarProps) {
           </button>
         )}
         {updateStatus?.state === "error" && (
-          <span
-            className="app-no-drag text-muted-foreground/80"
-            title={updateStatus.message}
+          <button
+            type="button"
+            onClick={() => void onUpdateClick()}
+            className="app-no-drag text-muted-foreground/80 hover:text-foreground transition-colors"
+            title={`${updateStatus.message} — click to retry`}
           >
             Update check failed
-          </span>
+          </button>
         )}
       </div>
       <div className="flex items-center gap-3.5 tabular-nums">

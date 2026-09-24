@@ -27,7 +27,7 @@ BetterDB is a lightweight desktop application for managing SQL warehouses, docum
 
 | Engine | Kind | Notes |
 | ------ | ---- | ----- |
-| PostgreSQL | SQL | Also Supabase, AWS/RDS Postgres, Databricks, CockroachDB |
+| PostgreSQL | SQL | Also Supabase, AWS/RDS Postgres, Databricks Lakebase (Autoscaling), CockroachDB |
 | MySQL / MariaDB | SQL | |
 | SQL Server | SQL | |
 | Oracle | SQL | Requires Oracle Instant Client locally |
@@ -190,9 +190,9 @@ The **Nightly** workflow (`.github/workflows/nightly.yml`) runs daily at 06:00 U
 
 1. Skips successfully when `dev` HEAD matches the commit of the latest `v*-nightly*` tag.
 2. Otherwise sets an ephemeral version `{base}-nightly.{YYYYMMDD}.{shortsha}` (does not push to `dev`).
-3. Builds macOS / Windows / Linux installers and publishes a GitHub prerelease with only those three installers (Mac is Developer ID–signed and notarized). Silent OTA feed files stay on the production **Release** workflow.
+3. Builds macOS / Windows / Linux installers and publishes a GitHub prerelease with those three installers plus electron-updater OTA feeds (`nightly*.yml`, blockmaps, Mac zip). Mac is Developer ID–signed and notarized.
 
-Force-update checks keep channels separate: stable/alpha/beta/rc installs never consider nightlies; nightly installs only update to newer nightlies when OTA feeds are present.
+Update checks keep channels separate: stable/alpha/beta/rc installs never consider nightlies; nightly installs silently update only to newer nightlies via the `nightly` channel.
 
 Local `npm` / Vite serve shows a **Dev** pill and uses the blueprint app icon; packaged nightlies install as **BetterDB Nightly** (separate app id / data dir from production), show the **Nightly** pill, and ship the night-sky icon; stable releases show no stage pill and keep the production icon.
 

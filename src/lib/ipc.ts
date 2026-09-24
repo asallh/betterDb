@@ -10,6 +10,10 @@ import type {
   QueryHistoryEntry,
   SavedQuery,
   ExportRequest,
+  DockerCreateRequest,
+  DockerCreateResult,
+  DockerManagedContainer,
+  DockerStatus,
 } from "../../shared/types";
 
 export const db = {
@@ -94,4 +98,24 @@ export const db = {
   // Export
   exportData: (request: ExportRequest): Promise<{ success: boolean; filePath?: string; error?: string }> =>
     window.ipcRenderer.invoke("db:export", request),
+};
+
+export const docker = {
+  status: (): Promise<DockerStatus> =>
+    window.ipcRenderer.invoke("docker:status"),
+  list: (): Promise<DockerManagedContainer[]> =>
+    window.ipcRenderer.invoke("docker:list"),
+  create: (request: DockerCreateRequest): Promise<DockerCreateResult> =>
+    window.ipcRenderer.invoke("docker:create", request),
+  start: (containerName: string): Promise<void> =>
+    window.ipcRenderer.invoke("docker:start", containerName),
+  stop: (containerName: string): Promise<void> =>
+    window.ipcRenderer.invoke("docker:stop", containerName),
+  destroy: (
+    containerName: string
+  ): Promise<{ connectionId: string | null }> =>
+    window.ipcRenderer.invoke("docker:destroy", containerName),
+  /** Drop saved connections whose BetterDB containers were removed outside the app. */
+  reconcile: (): Promise<{ removedConnectionIds: string[] }> =>
+    window.ipcRenderer.invoke("docker:reconcile"),
 };

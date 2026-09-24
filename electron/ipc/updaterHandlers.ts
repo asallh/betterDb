@@ -1,6 +1,7 @@
 import { ipcMain, shell } from "electron";
 import { IPC } from "./channels";
 import {
+  checkForUpdatesNow,
   getAppUpdateStatus,
   installDownloadedUpdate,
   releaseUrlForStatus,
@@ -9,6 +10,8 @@ import {
 /** Updater IPC — always registered; never withholds DB handlers. */
 export function registerUpdaterIpcHandlers(): void {
   ipcMain.handle(IPC.UPDATER_GET_STATUS, async () => getAppUpdateStatus());
+
+  ipcMain.handle(IPC.UPDATER_CHECK, async () => checkForUpdatesNow());
 
   ipcMain.handle(IPC.UPDATER_INSTALL, async () => {
     installDownloadedUpdate();

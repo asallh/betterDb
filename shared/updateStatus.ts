@@ -1,4 +1,4 @@
-import { isNightlyVersion } from "./version";
+import { isNightlyVersion, parseVersion } from "./version";
 
 /** IPC push event for soft update status (main → renderer). */
 export const UPDATER_STATUS_EVENT = "updater:status";
@@ -10,6 +10,15 @@ export function updaterChannelForVersion(
   version: string
 ): UpdaterPublishChannel {
   return isNightlyVersion(version) ? "nightly" : "latest";
+}
+
+/**
+ * Whether electron-updater may treat GitHub prereleases as eligible updates.
+ * Stable installs stay on stable-only; alpha/beta/rc/nightly may follow newer
+ * prereleases on their channel.
+ */
+export function allowPrereleaseForVersion(version: string): boolean {
+  return parseVersion(version).stage !== "stable";
 }
 
 /**
