@@ -3,6 +3,7 @@ import { app, type BrowserWindow } from "electron";
 import electronUpdater from "electron-updater";
 import {
   UPDATER_STATUS_EVENT,
+  allowPrereleaseForVersion,
   githubReleaseUrl,
   updaterChannelForVersion,
   type AppUpdateStatus,
@@ -60,7 +61,7 @@ export function configureAutoUpdater(options: {
   const channel = updaterChannelForVersion(localVersion);
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
-  autoUpdater.allowPrerelease = true;
+  autoUpdater.allowPrerelease = allowPrereleaseForVersion(localVersion);
   autoUpdater.channel = channel;
 
   autoUpdater.on("checking-for-update", () => {
