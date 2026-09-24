@@ -15,6 +15,7 @@ import {
 import {
   buildConnectionString,
   detectEngineFromHost,
+  getExampleConnectionUri,
   isCloudHost,
   parseConnectionString,
 } from "@/lib/connectionString";
@@ -190,10 +191,13 @@ export function ConnectionForm({ connectionId, onClose }: Props) {
       }),
     };
 
-    // When connecting via a pasted Lakebase / Postgres URI, also store a
-    // rebuilt connection string (with any OAuth token filled in) so node-pg
-    // can use the URI path directly.
+    // When connecting via a pasted URI, store a rebuilt connection string
+    // (with any password / OAuth token filled in) so adapters can use the
+    // URI path directly with the correct engine scheme.
     if (mode === "uri" && connectionString.trim() && uriValid) {
+      const pastedScheme = connectionString
+        .trim()
+        .match(/^(?:jdbc:)?([a-z][a-z0-9+.-]*):\/\//i)?.[1];
       config.connectionString = buildConnectionString({
         host: form.host,
         port: form.port,
@@ -203,6 +207,7 @@ export function ConnectionForm({ connectionId, onClose }: Props) {
         ssl,
         trustServerCertificate: form.trustServerCertificate,
         engine: form.engine,
+        scheme: pastedScheme,
       });
     }
 
@@ -270,31 +275,80 @@ export function ConnectionForm({ connectionId, onClose }: Props) {
         <div className="space-y-2">
           <div>
             <label className="mb-1 block text-[11px] text-muted-foreground">
+              Database Engine
+            </label>
+            <select
+              className={inputClass}
+              value={form.engine}
+              onChange={(e) => {
+                const engine = e.target.value as ConnectionConfig["engine"];
+                const previousDefaultPort = String(getDefaultPort(form.engine));
+                const previousDefaultUser = getDefaultUser(form.engine);
+                setForm({
+                  ...form,
+                  engine,
+                  host: requiresHost(engine) ? form.host || "localhost" : "",
+                  port:
+                    form.port === previousDefaultPort
+                      ? String(getDefaultPort(engine))
+                      : form.port,
+                  database:
+                    form.database === getDefaultDatabase(form.engine)
+                      ? getDefaultDatabase(engine)
+                      : form.database,
+                  user:
+                    form.user === previousDefaultUser
+                      ? getDefaultUser(engine)
+                      : form.user,
+                  ssl: supportsSsl(engine) ? form.ssl : false,
+                });
+              }}
+            >
+              {DATABASE_ENGINE_ORDER.map((engine) => (
+                <option key={engine} value={engine}>
+                  {DATABASE_ENGINES[engine].label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] text-muted-foreground">
               Connection String
             </label>
             <textarea
               className={`${inputClass} resize-none font-mono`}
               rows={3}
-              placeholder="postgresql://you@company.com@ep-….database.us-east-1.cloud.databricks.com/databricks_postgres?sslmode=require"
+              placeholder={getExampleConnectionUri(form.engine)}
               value={connectionString}
               onChange={(e) => applyUri(e.target.value)}
               spellCheck={false}
             />
             <p className="mt-1 text-[10px] text-muted-foreground">
-              Paste a Databricks Lakebase Autoscaling URI, JDBC URI, or libpq{" "}
-              <span className="font-mono">host=…</span> string. Databricks hosts
-              are detected automatically with SSL enabled.
+              Paste a connection URI for the selected engine. Schemes like{" "}
+              <span className="font-mono">mysql://</span>,{" "}
+              <span className="font-mono">mongodb://</span>,{" "}
+              <span className="font-mono">redis://</span>, and Postgres/Lakebase
+              URIs are detected automatically. JDBC and libpq{" "}
+              <span className="font-mono">host=…</span> strings are also accepted
+              where applicable.
             </p>
+            {connectionString && uriValid && (
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                Detected: {DATABASE_ENGINES[form.engine].label}
+              </p>
+            )}
             {connectionString && !uriValid && (
               <p className="mt-1 text-[10px] text-destructive">
                 Invalid connection string format
               </p>
             )}
           </div>
-          {form.engine !== "sqlite" && (
+          {form.engine !== "sqlite" && form.engine !== "duckdb" && (
             <div>
               <label className="mb-1 block text-[11px] text-muted-foreground">
-                Password / OAuth token
+                {form.engine === "databricks"
+                  ? "Password / OAuth token"
+                  : "Password"}
               </label>
               <input
                 className={inputClass}

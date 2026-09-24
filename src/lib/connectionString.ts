@@ -1,11 +1,77 @@
 import type { ConnectionConfig, DatabaseEngine } from "../../shared/types";
 import {
+  DATABASE_ENGINES,
   engineFromScheme,
   getDefaultDatabase,
   getDefaultPort,
   getDefaultUser,
   supportsSsl,
 } from "./databaseEngines";
+
+/** Parsed URI fields plus the original scheme when present (e.g. mongodb+srv). */
+export type ParsedConnectionString = Partial<ConnectionConfig> & {
+  uriScheme?: string;
+};
+
+/**
+ * Primary URI scheme for an engine. Prefers an explicit pasted scheme when it
+ * is valid for the engine; otherwise prefers postgresql over postgres, and
+ * rediss when Redis SSL is enabled.
+ */
+export function getPrimaryUriScheme(
+  engine: DatabaseEngine,
+  options?: { ssl?: boolean; preferredScheme?: string }
+): string {
+  const schemes = DATABASE_ENGINES[engine].uriSchemes;
+  const preferred = options?.preferredScheme?.toLowerCase();
+  if (preferred && schemes.includes(preferred)) {
+    return preferred;
+  }
+  if (engine === "redis" && options?.ssl && schemes.includes("rediss")) {
+    return "rediss";
+  }
+  if (schemes.includes("postgresql")) return "postgresql";
+  return schemes[0];
+}
+
+/** Placeholder / help-text example URI for the connection form. */
+export function getExampleConnectionUri(engine: DatabaseEngine): string {
+  switch (engine) {
+    case "databricks":
+      return "postgresql://you@company.com@ep-….database.us-east-1.cloud.databricks.com/databricks_postgres?sslmode=require";
+    case "sqlite":
+      return "sqlite:///path/to/db.sqlite";
+    case "duckdb":
+      return "duckdb:///path/to/db.duckdb";
+    case "redis":
+      return "redis://:pass@localhost:6379/0";
+    case "mongodb":
+      return "mongodb://user:pass@localhost:27017/mydb";
+    case "mysql":
+      return "mysql://user:pass@localhost:3306/mydb";
+    case "mariadb":
+      return "mariadb://user:pass@localhost:3306/mydb";
+    case "sqlserver":
+      return "sqlserver://sa:pass@localhost:1433/mydb";
+    case "cockroach":
+      return "postgresql://root@localhost:26257/defaultdb";
+    case "oracle":
+      return "oracle://system:pass@localhost:1521/FREEPDB1";
+    case "db2":
+      return "db2://db2inst1:pass@localhost:50000/SAMPLE";
+    case "snowflake":
+      return "snowflake://user@account/db";
+    case "clickhouse":
+      return "clickhouse://default@localhost:8123/default";
+    case "bigquery":
+      return "bigquery://project-id";
+    case "supabase":
+    case "aws":
+    case "postgres":
+    default:
+      return "postgresql://user:pass@localhost:5432/mydb";
+  }
+}
 
 /**
  * Lakebase Autoscaling hosts look like:
@@ -78,7 +144,7 @@ function normalizeUriInput(raw: string): string {
  *   host=ep-….database.us-east-1.cloud.databricks.com port=5432 user=role
  *   password=… dbname=databricks_postgres sslmode=require
  */
-function parseLibpqConnectionString(input: string): Partial<ConnectionConfig> | null {
+function parseLibpqConnectionString(input: string): ParsedConnectionString | null {
   const trimmed = input.trim();
   if (!trimmed || /:\/\//.test(trimmed) || !/=/.test(trimmed)) return null;
 
@@ -126,7 +192,7 @@ function parseLibpqConnectionString(input: string): Partial<ConnectionConfig> | 
  */
 export function parseConnectionString(
   raw: string
-): Partial<ConnectionConfig> | null {
+): ParsedConnectionString | null {
   const uri = normalizeUriInput(raw);
   if (!uri) return null;
 
@@ -140,13 +206,16 @@ export function parseConnectionString(
     let engine = engineFromScheme(scheme);
     if (!engine) return null;
 
-    if (engine === "sqlite") {
+    if (engine === "sqlite" || engine === "duckdb") {
       const database =
         scheme === "file"
           ? decodeUriComponentSafe(new URL(uri).pathname)
-          : decodeUriComponentSafe(uri.replace(/^sqlite:\/\//i, ""));
+          : decodeUriComponentSafe(
+              uri.replace(new RegExp(`^${scheme}:\\/\\/`, "i"), "")
+            );
       return {
         engine,
+        uriScheme: scheme,
         host: "",
         port: 0,
         database,
@@ -170,9 +239,11 @@ export function parseConnectionString(
 
     const defaultPort = getDefaultPort(engine);
     const defaultUser = getDefaultUser(engine);
+    const sslFromScheme = scheme === "rediss" || scheme === "mongodb+srv";
 
     return {
       engine,
+      uriScheme: scheme,
       host,
       port: parseInt(url.port, 10) || defaultPort,
       database: decodeUriComponentSafe(url.pathname.replace(/^\//, "")) ||
@@ -180,6 +251,7 @@ export function parseConnectionString(
       user: decodeUriComponentSafe(url.username) || defaultUser,
       password: decodeUriComponentSafe(url.password || ""),
       ssl:
+        sslFromScheme ||
         url.searchParams.get("sslmode") === "require" ||
         url.searchParams.get("sslmode") === "verify-ca" ||
         url.searchParams.get("sslmode") === "verify-full" ||
@@ -218,28 +290,40 @@ export function buildConnectionString(form: {
   ssl: boolean;
   trustServerCertificate?: boolean;
   engine: DatabaseEngine;
+  /** Preserve pasted scheme when valid (e.g. mongodb+srv, rediss, cockroach). */
+  scheme?: string;
 }): string {
-  if (form.engine === "sqlite") {
-    return form.database ? `sqlite://${form.database}` : "";
+  const scheme = getPrimaryUriScheme(form.engine, {
+    ssl: form.ssl,
+    preferredScheme: form.scheme,
+  });
+
+  if (form.engine === "sqlite" || form.engine === "duckdb") {
+    return form.database ? `${scheme}://${form.database}` : "";
   }
-  const pass = form.password ? `:${encodeURIComponent(form.password)}` : "";
+
   // Encode `@` in roles (email OAuth users) so the URI stays unambiguous.
   const user = form.user ? encodeURIComponent(form.user) : "";
-  const scheme =
-    form.engine === "sqlserver"
-      ? "sqlserver"
-      : form.engine === "mysql" ||
-          form.engine === "mariadb" ||
-          form.engine === "oracle"
-        ? form.engine
-        : "postgresql";
+  const pass = form.password ? `:${encodeURIComponent(form.password)}` : "";
+  const auth =
+    user || form.password ? `${user}${pass}@` : "";
+
   const params = new URLSearchParams();
   if (form.engine === "sqlserver") {
     if (form.ssl) params.set("encrypt", "true");
     if (form.trustServerCertificate) params.set("trustServerCertificate", "true");
-  } else if (supportsSsl(form.engine) && form.ssl) {
+  } else if (
+    supportsSsl(form.engine) &&
+    form.ssl &&
+    form.engine !== "redis" &&
+    form.engine !== "mongodb" &&
+    scheme !== "rediss" &&
+    scheme !== "mongodb+srv"
+  ) {
     params.set("sslmode", "require");
   }
   const query = params.size > 0 ? `?${params.toString()}` : "";
-  return `${scheme}://${user}${pass}@${form.host}:${form.port}/${form.database}${query}`;
+  const port =
+    scheme === "mongodb+srv" ? "" : `:${form.port}`;
+  return `${scheme}://${auth}${form.host}${port}/${form.database}${query}`;
 }
