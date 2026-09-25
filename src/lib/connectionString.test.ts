@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildConnectionString,
   detectEngineFromHost,
+  getExampleConnectionUri,
   isCloudHost,
   isLakebaseHost,
   parseConnectionString,
@@ -124,6 +125,7 @@ describe("connectionString general", () => {
       user: "postgres",
       password: "secret",
       database: "app",
+      uriScheme: "postgresql",
     });
   });
 
@@ -135,5 +137,237 @@ describe("connectionString general", () => {
 
   it("uses Databricks Lakebase default database name", () => {
     expect(getDefaultDatabase("databricks")).toBe("databricks_postgres");
+  });
+});
+
+describe("connectionString multi-engine", () => {
+  it("parses mysql, mariadb, and sqlserver URIs", () => {
+    expect(
+      parseConnectionString("mysql://root:secret@localhost:3306/app")
+    ).toMatchObject({
+      engine: "mysql",
+      uriScheme: "mysql",
+      host: "localhost",
+      port: 3306,
+      user: "root",
+      password: "secret",
+      database: "app",
+    });
+    expect(
+      parseConnectionString("mariadb://root:secret@db.example.com:3306/app")
+    ).toMatchObject({
+      engine: "mariadb",
+      uriScheme: "mariadb",
+      host: "db.example.com",
+    });
+    expect(
+      parseConnectionString(
+        "sqlserver://sa:secret@localhost:1433/mydb?encrypt=true&trustServerCertificate=true"
+      )
+    ).toMatchObject({
+      engine: "sqlserver",
+      uriScheme: "sqlserver",
+      host: "localhost",
+      port: 1433,
+      database: "mydb",
+      ssl: true,
+      trustServerCertificate: true,
+    });
+  });
+
+  it("parses mongodb and mongodb+srv URIs", () => {
+    expect(
+      parseConnectionString("mongodb://user:pass@localhost:27017/mydb")
+    ).toMatchObject({
+      engine: "mongodb",
+      uriScheme: "mongodb",
+      host: "localhost",
+      port: 27017,
+      user: "user",
+      password: "pass",
+      database: "mydb",
+    });
+    expect(
+      parseConnectionString("mongodb+srv://user:pass@cluster.example.com/mydb")
+    ).toMatchObject({
+      engine: "mongodb",
+      uriScheme: "mongodb+srv",
+      host: "cluster.example.com",
+      database: "mydb",
+      ssl: true,
+    });
+  });
+
+  it("parses redis and rediss URIs", () => {
+    expect(parseConnectionString("redis://:s3cret@localhost:6379/0")).toMatchObject({
+      engine: "redis",
+      uriScheme: "redis",
+      host: "localhost",
+      port: 6379,
+      password: "s3cret",
+      database: "0",
+    });
+    expect(parseConnectionString("rediss://localhost:6379/0")).toMatchObject({
+      engine: "redis",
+      uriScheme: "rediss",
+      ssl: true,
+    });
+  });
+
+  it("parses sqlite and cockroach URIs", () => {
+    expect(parseConnectionString("sqlite:///tmp/app.db")).toMatchObject({
+      engine: "sqlite",
+      uriScheme: "sqlite",
+      database: "/tmp/app.db",
+      host: "",
+    });
+    expect(
+      parseConnectionString("cockroach://root@localhost:26257/defaultdb")
+    ).toMatchObject({
+      engine: "cockroach",
+      uriScheme: "cockroach",
+      host: "localhost",
+      port: 26257,
+      database: "defaultdb",
+    });
+  });
+
+  it("builds the correct scheme per engine", () => {
+    expect(
+      buildConnectionString({
+        engine: "mysql",
+        host: "localhost",
+        port: 3306,
+        database: "app",
+        user: "root",
+        password: "secret",
+        ssl: false,
+      })
+    ).toBe("mysql://root:secret@localhost:3306/app");
+
+    expect(
+      buildConnectionString({
+        engine: "mongodb",
+        host: "localhost",
+        port: 27017,
+        database: "mydb",
+        user: "user",
+        password: "pass",
+        ssl: false,
+      })
+    ).toBe("mongodb://user:pass@localhost:27017/mydb");
+
+    expect(
+      buildConnectionString({
+        engine: "mongodb",
+        host: "cluster.example.com",
+        port: 27017,
+        database: "mydb",
+        user: "user",
+        password: "pass",
+        ssl: true,
+        scheme: "mongodb+srv",
+      })
+    ).toBe("mongodb+srv://user:pass@cluster.example.com/mydb");
+
+    expect(
+      buildConnectionString({
+        engine: "redis",
+        host: "localhost",
+        port: 6379,
+        database: "0",
+        user: "",
+        password: "s3cret",
+        ssl: false,
+      })
+    ).toBe("redis://:s3cret@localhost:6379/0");
+
+    expect(
+      buildConnectionString({
+        engine: "redis",
+        host: "localhost",
+        port: 6379,
+        database: "0",
+        user: "",
+        password: "",
+        ssl: true,
+      })
+    ).toBe("rediss://localhost:6379/0");
+
+    expect(
+      buildConnectionString({
+        engine: "sqlserver",
+        host: "localhost",
+        port: 1433,
+        database: "mydb",
+        user: "sa",
+        password: "secret",
+        ssl: true,
+        trustServerCertificate: true,
+      })
+    ).toBe(
+      "sqlserver://sa:secret@localhost:1433/mydb?encrypt=true&trustServerCertificate=true"
+    );
+
+    expect(
+      buildConnectionString({
+        engine: "sqlite",
+        host: "",
+        port: 0,
+        database: "/tmp/app.db",
+        user: "",
+        password: "",
+        ssl: false,
+      })
+    ).toBe("sqlite:///tmp/app.db");
+
+    expect(
+      buildConnectionString({
+        engine: "cockroach",
+        host: "localhost",
+        port: 26257,
+        database: "defaultdb",
+        user: "root",
+        password: "",
+        ssl: false,
+        scheme: "cockroach",
+      })
+    ).toBe("cockroach://root@localhost:26257/defaultdb");
+  });
+
+  it("never emits postgresql:// for non-Postgres-family engines", () => {
+    const engines = [
+      "mysql",
+      "mariadb",
+      "sqlserver",
+      "mongodb",
+      "redis",
+      "oracle",
+      "db2",
+      "clickhouse",
+      "sqlite",
+    ] as const;
+
+    for (const engine of engines) {
+      const uri = buildConnectionString({
+        engine,
+        host: "localhost",
+        port: 1,
+        database: "db",
+        user: "u",
+        password: "p",
+        ssl: false,
+      });
+      expect(uri.startsWith("postgresql://")).toBe(false);
+      expect(uri.startsWith("postgres://")).toBe(false);
+    }
+  });
+
+  it("returns engine-specific example URIs", () => {
+    expect(getExampleConnectionUri("mysql")).toContain("mysql://");
+    expect(getExampleConnectionUri("mongodb")).toContain("mongodb://");
+    expect(getExampleConnectionUri("redis")).toContain("redis://");
+    expect(getExampleConnectionUri("databricks")).toContain("databricks.com");
+    expect(getExampleConnectionUri("sqlite")).toContain("sqlite://");
   });
 });
