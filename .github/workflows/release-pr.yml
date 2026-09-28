@@ -15,11 +15,14 @@ concurrency:
 
 jobs:
   validate:
-    if: |
-      github.event.pull_request.head.ref == 'dev' &&
-      github.event.pull_request.base.ref == 'main'
     runs-on: ubuntu-latest
     steps:
+      - name: Enforce integration branch
+        if: github.event.pull_request.head.ref != 'dev'
+        run: |
+          echo "::error::Only \`dev\` may merge into \`main\`. Land feature work on \`dev\` first, then open a release PR from \`dev\` → \`main\`."
+          exit 1
+
       - uses: actions/checkout@v4
         with:
           ref: dev
