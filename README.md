@@ -140,9 +140,9 @@ npm run lint
 
 ## Releasing
 
-Releases follow [semver](https://semver.org/) via labels on a `dev` → `main` pull request.
+Releases follow [semver](https://semver.org/) via labels on a `dev` → `main` pull request. Direct pushes to `main` and `dev` are blocked; `main` also requires **one approving review** before merge.
 
-1. Land feature work on `dev` through normal PRs.
+1. Land feature work on `dev` through normal PRs (required check: `check`, plus **one approving review**).
 2. Open a PR from `dev` into `main`.
 3. Add **exactly one** bump label:
    - `release:patch` — bug fixes
@@ -150,7 +150,7 @@ Releases follow [semver](https://semver.org/) via labels on a `dev` → `main` p
    - `release:major` — breaking changes
 4. Optionally add one stage label: `release:alpha`, `release:beta`, or `release:rc`. Omit for a stable release.
 5. The **Release PR** workflow bumps `package.json` on `dev` and posts a checklist comment. Missing labels fail the check (with a bot comment) and do not push.
-6. Update [CHANGELOG.md](CHANGELOG.md) with user-facing notes, wait for CI green, then merge.
+6. Update [CHANGELOG.md](CHANGELOG.md) with user-facing notes, wait for CI green (`check` + `validate`), get **one approval**, then merge.
 7. The merge pushes to `main` and the **Release** workflow builds macOS / Windows / Linux installers (Mac is Developer ID–signed and notarized), then publishes them to [GitHub Releases](https://github.com/asallh/betterDb/releases) with sequential asset uploads. Incomplete releases can be repaired; complete ones are skipped unless you re-run with `workflow_dispatch` + `force`.
 
 Use `release:skip` only when the `dev` → `main` PR must not cut a version (rare).
@@ -172,11 +172,10 @@ CI imports the `.p12` into a temporary keychain and uses identity auto-discovery
 
 Setup outline:
 
-1. Enroll in the [Apple Developer Program](https://developer.apple.com/programs/).
-2. Create a **Developer ID Application** certificate in Xcode / developer.apple.com, export it as `.p12`, then:
+1. Create a **Developer ID Application** certificate in Xcode / developer.apple.com, export it as `.p12`, then:
    `base64 -i YourCert.p12 | tr -d '\n' | pbcopy` → paste into `CSC_LINK` (must be the `.p12`, not the `.cer`).
    Put the exact export password in `CSC_KEY_PASSWORD`.
-3. In [App Store Connect → Users and Access → Integrations → Team Keys](https://appstoreconnect.apple.com/access/integrations/api), create a Team API key with App Manager access. Download `AuthKey_<KEYID>.p8` once; store Key ID, Issuer ID, and the `.p8` contents (or `base64 -i AuthKey_….p8`) as the secrets above.
+2. In [App Store Connect → Users and Access → Integrations → Team Keys](https://appstoreconnect.apple.com/access/integrations/api), create a Team API key with App Manager access. Download `AuthKey_<KEYID>.p8` once; store Key ID, Issuer ID, and the `.p8` contents (or `base64 -i AuthKey_….p8`) as the secrets above.
 
 Local `npm run build:nightly` / `npm run build:prod` stay **unsigned** on purpose. If Gatekeeper blocks a copied local `.app`:
 
@@ -207,7 +206,15 @@ Local `npm` / Vite serve shows a **Dev** pill and uses the blueprint app icon; p
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for local setup and how to add a new database adapter.
+Contributions are welcome — open a PR if you see something worth improving, or [file an issue](https://github.com/asallh/betterDb/issues) if something is broken.
+
+**Branch rules (enforced on GitHub):**
+
+- Open feature / fix PRs into **`dev`** (not `main`). Required check: `check`, plus **1 approving review**.
+- **`main`** is release-only (`dev` → `main`). Required checks: `check`, `validate`, plus **1 approving review**.
+- Force pushes and branch deletion are disabled. Squash merge only. Repo admins can bypass protections (needed to merge your own PRs as a solo maintainer).
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for local setup, the full protection matrix, and how to add a new database adapter.
 
 ## License
 
