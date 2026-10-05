@@ -27,14 +27,14 @@ Work lands on **`dev`**. **`main`** is release-only.
 
 | Branch | Pull request required | Required checks | Approvals | Notes |
 | ------ | --------------------- | --------------- | --------- | ----- |
-| `dev`  | Yes                   | `check`         | **1**     | Integration branch. Direct pushes are blocked (including for admins). |
+| `dev`  | Yes                   | `check`         | **1**     | Integration branch. Direct pushes blocked for non-admins. |
 | `main` | Yes                   | `check`, `validate` | **1** | Release branch. Linear history; conversations must be resolved. |
 
 Shared rules on both branches:
 
 - Force pushes and branch deletion are disabled
-- Branch protection is enforced for administrators
 - History must stay linear (squash merge)
+- **Admins can bypass** (so the maintainer can merge their own PRs without a second reviewer). Everyone else must satisfy PR + checks + approval.
 
 ### Feature / fix workflow
 

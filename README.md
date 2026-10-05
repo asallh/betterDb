@@ -212,7 +212,7 @@ Contributions are welcome — open a PR if you see something worth improving, or
 
 - Open feature / fix PRs into **`dev`** (not `main`). Required check: `check`, plus **1 approving review**.
 - **`main`** is release-only (`dev` → `main`). Required checks: `check`, `validate`, plus **1 approving review**.
-- Force pushes and direct pushes to `dev` / `main` are disabled (including for admins). Squash merge only.
+- Force pushes and branch deletion are disabled. Squash merge only. Repo admins can bypass protections (needed to merge your own PRs as a solo maintainer).
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for local setup, the full protection matrix, and how to add a new database adapter.
 
