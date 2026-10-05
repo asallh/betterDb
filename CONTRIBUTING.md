@@ -27,7 +27,7 @@ Work lands on **`dev`**. **`main`** is release-only.
 
 | Branch | Pull request required | Required checks | Approvals | Notes |
 | ------ | --------------------- | --------------- | --------- | ----- |
-| `dev`  | Yes                   | `check`         | 0         | Integration branch. Direct pushes are blocked (including for admins). |
+| `dev`  | Yes                   | `check`         | **1**     | Integration branch. Direct pushes are blocked (including for admins). |
 | `main` | Yes                   | `check`, `validate` | **1** | Release branch. Linear history; conversations must be resolved. |
 
 Shared rules on both branches:
@@ -40,7 +40,7 @@ Shared rules on both branches:
 
 1. Branch from `dev` (or fork, then branch from `dev`).
 2. Open a PR **into `dev`**.
-3. Wait for CI (`check`) to pass.
+3. Wait for CI (`check`) to pass and get **one approving review**.
 4. Maintainers merge when ready.
 
 Do **not** open feature PRs directly into `main`.
