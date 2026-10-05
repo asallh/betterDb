@@ -142,7 +142,7 @@ npm run lint
 
 Releases follow [semver](https://semver.org/) via labels on a `dev` → `main` pull request. Direct pushes to `main` and `dev` are blocked; `main` also requires **one approving review** before merge.
 
-1. Land feature work on `dev` through normal PRs (required check: `check`, plus **one approving review**).
+1. Land feature work on `dev` through normal PRs (required check on PRs: `check`). The Release PR bot may push version bumps directly to `dev`.
 2. Open a PR from `dev` into `main`.
 3. Add **exactly one** bump label:
    - `release:patch` — bug fixes
@@ -210,9 +210,9 @@ Contributions are welcome — open a PR if you see something worth improving, or
 
 **Branch rules (enforced on GitHub):**
 
-- Open feature / fix PRs into **`dev`** (not `main`). Required check: `check`, plus **1 approving review**.
-- **`main`** is release-only (`dev` → `main`). Required checks: `check`, `validate`, plus **1 approving review**.
-- Force pushes and branch deletion are disabled. Squash merge only. Repo admins can bypass protections (needed to merge your own PRs as a solo maintainer).
+- Open feature / fix PRs into **`dev`** (not `main`). PRs run the `check` workflow. Direct pushes to `dev` are allowed so the release bot can bump versions.
+- **`main`** is release-only (`dev` → `main`). Required checks: `check`, `validate`, plus **1 approving review** (admins can bypass).
+- Force pushes and branch deletion are disabled. Squash merge on `main`.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for local setup, the full protection matrix, and how to add a new database adapter.
 
