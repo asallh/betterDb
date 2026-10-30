@@ -3,6 +3,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import type { QueryTab } from "@/stores/queryStore";
 import { db } from "@/lib/ipc";
 import { getTypeColor } from "@/lib/columnTypes";
+import { isDestructiveQuery } from "@/lib/destructiveQuery";
 import { CellExpandModal } from "@/components/shared/CellExpandModal";
 import { Loader2, AlertCircle, Download, Maximize2 } from "lucide-react";
 
@@ -107,11 +108,25 @@ export function QueryResults({ tab }: Props) {
   }
 
   if (result.rows.length === 0) {
+    const destructive = isDestructiveQuery(tab.sql);
     return (
-      <div className="flex h-full items-center justify-center text-muted-foreground">
-        <span className="text-sm">
-          Query executed successfully. {result.rowCount} rows affected. ({result.durationMs}ms)
-        </span>
+      <div className="flex h-full items-center justify-center p-4">
+        <div
+          className={
+            destructive
+              ? "flex gap-2 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+              : "text-sm text-muted-foreground"
+          }
+        >
+          {destructive && (
+            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+          )}
+          <span>
+            {destructive
+              ? `Destructive query completed. ${result.rowCount} rows affected. (${result.durationMs}ms)`
+              : `Query executed successfully. ${result.rowCount} rows affected. (${result.durationMs}ms)`}
+          </span>
+        </div>
       </div>
     );
   }

@@ -3,6 +3,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { db } from "@/lib/ipc";
 import { getTypeColor } from "@/lib/columnTypes";
 import { CellExpandModal } from "@/components/shared/CellExpandModal";
+import { ConfirmDestructiveDialog } from "@/components/shared/ConfirmDestructiveDialog";
 import type { QueryResult, ColumnInfo } from "../../../shared/types";
 import {
   Loader2,
@@ -53,6 +54,9 @@ export function TableViewer({ schema, table }: Props) {
     column: string;
     dataType?: string;
   } | null>(null);
+  const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [deletingRows, setDeletingRows] = useState(false);
   const editInputRef = useRef<HTMLInputElement>(null);
   const parentRef = useRef<HTMLDivElement>(null);
   const resizingRef = useRef<{ col: string; startX: number; startWidth: number } | null>(null);
@@ -121,7 +125,14 @@ export function TableViewer({ schema, table }: Props) {
     setInsertingRow(false);
     setEditError(null);
     setColWidths({});
+    setSelectedRows(new Set());
+    setConfirmDeleteOpen(false);
   }, [schema, table]);
+
+  useEffect(() => {
+    setSelectedRows(new Set());
+    setConfirmDeleteOpen(false);
+  }, [page, pageSize]);
 
   useEffect(() => {
     loadData();
@@ -237,21 +248,53 @@ export function TableViewer({ schema, table }: Props) {
     setEditError(null);
   }
 
-  async function handleDeleteRow(rowIndex: number) {
-    if (!result || primaryKeys.length === 0) return;
-    const row = result.rows[rowIndex];
-    const pkValues: Record<string, unknown> = {};
-    for (const pk of primaryKeys) {
-      pkValues[pk] = row[pk];
+  function toggleRowSelected(rowIndex: number) {
+    setSelectedRows((prev) => {
+      const next = new Set(prev);
+      if (next.has(rowIndex)) next.delete(rowIndex);
+      else next.add(rowIndex);
+      return next;
+    });
+  }
+
+  function toggleSelectAllOnPage() {
+    if (!result) return;
+    const allSelected =
+      result.rows.length > 0 &&
+      result.rows.every((_, i) => selectedRows.has(i));
+    if (allSelected) {
+      setSelectedRows(new Set());
+    } else {
+      setSelectedRows(new Set(result.rows.map((_, i) => i)));
+    }
+  }
+
+  async function handleDeleteSelected() {
+    if (!result || primaryKeys.length === 0 || selectedRows.size === 0) return;
+
+    setDeletingRows(true);
+    setConfirmDeleteOpen(false);
+
+    const indices = [...selectedRows].sort((a, b) => a - b);
+    for (const rowIndex of indices) {
+      const row = result.rows[rowIndex];
+      if (!row) continue;
+      const pkValues: Record<string, unknown> = {};
+      for (const pk of primaryKeys) {
+        pkValues[pk] = row[pk];
+      }
+      const res = await db.deleteRow({ schema, table, primaryKeys: pkValues });
+      if (res.error) {
+        setEditError(res.error);
+        setDeletingRows(false);
+        return;
+      }
     }
 
-    const res = await db.deleteRow({ schema, table, primaryKeys: pkValues });
-    if (res.error) {
-      setEditError(res.error);
-      return;
-    }
-    await loadData();
+    setSelectedRows(new Set());
     setEditError(null);
+    setDeletingRows(false);
+    await loadData();
   }
 
   async function handleInsertRow() {
@@ -306,6 +349,13 @@ export function TableViewer({ schema, table }: Props) {
 
   const totalPages = Math.ceil(totalRows / pageSize);
   const canEdit = primaryKeys.length > 0;
+  const selectedCount = selectedRows.size;
+  const allPageSelected =
+    !!result &&
+    result.rows.length > 0 &&
+    result.rows.every((_, i) => selectedRows.has(i));
+  const somePageSelected =
+    !!result && result.rows.some((_, i) => selectedRows.has(i));
 
   return (
     <div className="flex h-full flex-col">
@@ -322,6 +372,21 @@ export function TableViewer({ schema, table }: Props) {
           )}
         </div>
         <div className="flex items-center gap-2">
+          {canEdit && selectedCount > 0 && (
+            <>
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteOpen(true)}
+                disabled={deletingRows}
+                className="flex items-center gap-1 rounded border border-destructive/50 bg-destructive/10 px-2 py-0.5 text-destructive hover:bg-destructive/20 transition-colors disabled:opacity-50"
+                title="Delete selected rows"
+              >
+                <Trash2 className="h-3 w-3" />
+                Delete {selectedCount} selected
+              </button>
+              <div className="h-3 w-px bg-border" />
+            </>
+          )}
           <button
             onClick={() => handleExport("csv")}
             disabled={!result || result.rows.length === 0}
@@ -340,19 +405,21 @@ export function TableViewer({ schema, table }: Props) {
             <Download className="h-3 w-3" />
             JSON
           </button>
-          <div className="h-3 w-px bg-border" />
           {canEdit && (
-            <button
-              onClick={() => {
-                setInsertingRow(true);
-                setNewRowValues({});
-                setEditError(null);
-              }}
-              className="flex items-center gap-1 rounded border border-border px-2 py-0.5 hover:bg-accent transition-colors"
-            >
-              <Plus className="h-3 w-3" />
-              Add Row
-            </button>
+            <>
+              <div className="h-3 w-px bg-border" />
+              <button
+                onClick={() => {
+                  setInsertingRow(true);
+                  setNewRowValues({});
+                  setEditError(null);
+                }}
+                className="flex items-center gap-1 rounded border border-border px-2 py-0.5 hover:bg-accent transition-colors"
+              >
+                <Plus className="h-3 w-3" />
+                Add Row
+              </button>
+            </>
           )}
           <select
             value={pageSize}
@@ -421,7 +488,18 @@ export function TableViewer({ schema, table }: Props) {
             <thead className="sticky top-0 z-10 bg-muted">
               <tr>
                 {canEdit && (
-                  <th className="border-b border-r border-border px-1 py-1 text-center font-medium text-muted-foreground" />
+                  <th className="border-b border-r border-border px-1 py-1 text-center font-medium text-muted-foreground">
+                    <input
+                      type="checkbox"
+                      checked={allPageSelected}
+                      ref={(el) => {
+                        if (el) el.indeterminate = somePageSelected && !allPageSelected;
+                      }}
+                      onChange={toggleSelectAllOnPage}
+                      aria-label="Select all rows on this page"
+                      className="h-3 w-3 accent-destructive"
+                    />
+                  </th>
                 )}
                 <th className="border-b border-r border-border px-2 py-1 text-left font-medium text-muted-foreground">
                   #
@@ -564,13 +642,13 @@ export function TableViewer({ schema, table }: Props) {
                       >
                         {canEdit && (
                           <td className="border-b border-r border-border px-1 py-1 text-center">
-                            <button
-                              onClick={() => handleDeleteRow(virtualRow.index)}
-                              className="rounded p-0.5 text-muted-foreground/30 opacity-0 group-hover:opacity-100 hover:text-destructive hover:bg-destructive/10 transition-all"
-                              title="Delete row"
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </button>
+                            <input
+                              type="checkbox"
+                              checked={selectedRows.has(virtualRow.index)}
+                              onChange={() => toggleRowSelected(virtualRow.index)}
+                              aria-label={`Select row ${rowNum}`}
+                              className="h-3 w-3 accent-destructive"
+                            />
                           </td>
                         )}
                         <td className="border-b border-r border-border px-2 py-1 text-muted-foreground">
@@ -689,6 +767,30 @@ export function TableViewer({ schema, table }: Props) {
           column={expandedCell.column}
           dataType={expandedCell.dataType}
           onClose={() => setExpandedCell(null)}
+        />
+      )}
+
+      {confirmDeleteOpen && (
+        <ConfirmDestructiveDialog
+          title="Delete rows"
+          body={
+            <p>
+              Delete{" "}
+              <span className="font-medium text-foreground">{selectedCount}</span>{" "}
+              {selectedCount === 1 ? "row" : "rows"} from{" "}
+              <span className="font-medium text-foreground">
+                {schema}.{table}
+              </span>
+              ? This cannot be undone.
+            </p>
+          }
+          confirmLabel={
+            selectedCount === 1 ? "Delete row" : `Delete ${selectedCount} rows`
+          }
+          onConfirm={() => {
+            void handleDeleteSelected();
+          }}
+          onCancel={() => setConfirmDeleteOpen(false)}
         />
       )}
     </div>

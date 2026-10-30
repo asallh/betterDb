@@ -23,7 +23,7 @@ const REDIS_SCHEMA = /^\s*(FLUSHDB|FLUSHALL|SWAPDB)\b/i;
 const REDIS_SELECT_DB = /^\s*SELECT\s+\d+\s*$/i;
 
 /** Strip leading line/block comments so DDL after a comment still matches. */
-function stripLeadingNoise(statement: string): string {
+export function stripLeadingNoise(statement: string): string {
   let s = statement.trim();
   for (;;) {
     if (s.startsWith("--")) {

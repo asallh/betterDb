@@ -1,6 +1,10 @@
 import { create } from "zustand";
 import type { QueryResult } from "../../shared/types";
 import { db } from "@/lib/ipc";
+import {
+  isDestructiveQuery,
+  summarizeDestructiveQuery,
+} from "@/lib/destructiveQuery";
 import { isSchemaMutatingQuery } from "@/lib/schemaMutatingQuery";
 import { tabColorHex, type TabColorId } from "@/lib/tabColors";
 import { useConnectionStore } from "./connectionStore";
@@ -36,9 +40,15 @@ export interface QueryTab {
   isExecuting: boolean;
 }
 
+export interface PendingDestructive {
+  tabId: string;
+  summary: string;
+}
+
 interface QueryStore {
   tabs: QueryTab[];
   activeTabId: string;
+  pendingDestructive: PendingDestructive | null;
 
   addTab: () => void;
   closeTab: (id: string) => void;
@@ -46,7 +56,12 @@ interface QueryStore {
   renameTab: (id: string, title: string) => void;
   setTabColor: (id: string, color: TabColorId | null) => void;
   updateSQL: (id: string, sql: string) => void;
-  executeQuery: (id: string) => Promise<void>;
+  executeQuery: (
+    id: string,
+    opts?: { confirmed?: boolean }
+  ) => Promise<void>;
+  confirmPendingDestructive: () => Promise<void>;
+  cancelPendingDestructive: () => void;
 }
 
 function createTab(index: number): QueryTab {
@@ -65,6 +80,7 @@ export const useQueryStore = create<QueryStore>((set, get) => {
   return {
     tabs: [initial],
     activeTabId: initial.id,
+    pendingDestructive: null,
 
     addTab: () => {
       const tab = createTab(get().tabs.length + 1);
@@ -72,14 +88,17 @@ export const useQueryStore = create<QueryStore>((set, get) => {
     },
 
     closeTab: (id) => {
-      const { tabs, activeTabId } = get();
+      const { tabs, activeTabId, pendingDestructive } = get();
       const index = tabs.findIndex((t) => t.id === id);
       if (index === -1) return;
+
+      const clearPending =
+        pendingDestructive?.tabId === id ? { pendingDestructive: null } : {};
 
       // Never leave the workspace with zero query tabs
       if (tabs.length === 1) {
         const fresh = createTab(1);
-        set({ tabs: [fresh], activeTabId: fresh.id });
+        set({ tabs: [fresh], activeTabId: fresh.id, ...clearPending });
         return;
       }
 
@@ -90,7 +109,7 @@ export const useQueryStore = create<QueryStore>((set, get) => {
         const neighborIndex = Math.max(0, index - 1);
         newActive = next[Math.min(neighborIndex, next.length - 1)].id;
       }
-      set({ tabs: next, activeTabId: newActive });
+      set({ tabs: next, activeTabId: newActive, ...clearPending });
     },
 
     setActiveTab: (id) => set({ activeTabId: id }),
@@ -116,11 +135,23 @@ export const useQueryStore = create<QueryStore>((set, get) => {
       }));
     },
 
-    executeQuery: async (id) => {
+    executeQuery: async (id, opts) => {
       const tab = get().tabs.find((t) => t.id === id);
       if (!tab || !tab.sql.trim()) return;
 
+      const sql = tab.sql;
+      if (isDestructiveQuery(sql) && !opts?.confirmed) {
+        set({
+          pendingDestructive: {
+            tabId: id,
+            summary: summarizeDestructiveQuery(sql),
+          },
+        });
+        return;
+      }
+
       set((s) => ({
+        pendingDestructive: null,
         tabs: s.tabs.map((t) =>
           t.id === id ? { ...t, isExecuting: true, result: null } : t
         ),
@@ -128,7 +159,6 @@ export const useQueryStore = create<QueryStore>((set, get) => {
 
       try {
         const connectionId = useConnectionStore.getState().activeConnectionId;
-        const sql = tab.sql;
         const result = await db.executeQuery(sql, connectionId ?? undefined);
         set((s) => ({
           tabs: s.tabs.map((t) =>
@@ -158,6 +188,16 @@ export const useQueryStore = create<QueryStore>((set, get) => {
           ),
         }));
       }
+    },
+
+    confirmPendingDestructive: async () => {
+      const pending = get().pendingDestructive;
+      if (!pending) return;
+      await get().executeQuery(pending.tabId, { confirmed: true });
+    },
+
+    cancelPendingDestructive: () => {
+      set({ pendingDestructive: null });
     },
   };
 });

@@ -7,6 +7,7 @@ import { TableViewer } from "@/components/table/TableViewer";
 import { QueryHistory } from "@/components/query/QueryHistory";
 import { SavedQueries } from "@/components/query/SavedQueries";
 import { WorkspaceTab } from "@/components/layout/WorkspaceTab";
+import { ConfirmDestructiveDialog } from "@/components/shared/ConfirmDestructiveDialog";
 import { Plus, Table2, Clock, Bookmark, FileCode2 } from "lucide-react";
 
 type RightPanel = "history" | "saved" | null;
@@ -19,6 +20,13 @@ export function MainArea() {
   const closeTab = useQueryStore((s) => s.closeTab);
   const renameQueryTab = useQueryStore((s) => s.renameTab);
   const setQueryTabColor = useQueryStore((s) => s.setTabColor);
+  const pendingDestructive = useQueryStore((s) => s.pendingDestructive);
+  const confirmPendingDestructive = useQueryStore(
+    (s) => s.confirmPendingDestructive
+  );
+  const cancelPendingDestructive = useQueryStore(
+    (s) => s.cancelPendingDestructive
+  );
   const tableTabs = useTableViewStore((s) => s.tableTabs);
   const activeTableId = useTableViewStore((s) => s.activeTableId);
   const setActiveTable = useTableViewStore((s) => s.setActiveTable);
@@ -154,6 +162,26 @@ export function MainArea() {
           </div>
         )}
       </div>
+
+      {pendingDestructive && (
+        <ConfirmDestructiveDialog
+          title="Destructive query"
+          body={
+            <p>
+              This query includes{" "}
+              <span className="font-medium text-foreground">
+                {pendingDestructive.summary}
+              </span>
+              . This may permanently delete data. Continue?
+            </p>
+          }
+          confirmLabel="Run anyway"
+          onConfirm={() => {
+            void confirmPendingDestructive();
+          }}
+          onCancel={cancelPendingDestructive}
+        />
+      )}
     </div>
   );
 }
