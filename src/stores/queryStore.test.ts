@@ -34,7 +34,11 @@ function resetStore() {
     result: null,
     isExecuting: false,
   };
-  useQueryStore.setState({ tabs: [tab], activeTabId: tab.id });
+  useQueryStore.setState({
+    tabs: [tab],
+    activeTabId: tab.id,
+    pendingDestructive: null,
+  });
 }
 
 describe("queryStore", () => {
@@ -160,7 +164,7 @@ describe("queryStore", () => {
       const id = useQueryStore.getState().activeTabId;
       useQueryStore.getState().updateSQL(id, "DROP TABLE foo");
 
-      await useQueryStore.getState().executeQuery(id);
+      await useQueryStore.getState().executeQuery(id, { confirmed: true });
       await vi.advanceTimersByTimeAsync(300);
       expect(refreshAll).not.toHaveBeenCalled();
       expect(useQueryStore.getState().tabs[0].result?.error).toBe(
@@ -182,6 +186,64 @@ describe("queryStore", () => {
       expect(refreshAll).not.toHaveBeenCalled();
       await vi.advanceTimersByTimeAsync(300);
       expect(refreshAll).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("destructive query confirm gate", () => {
+    const okResult = {
+      columns: [],
+      rows: [],
+      rowCount: 3,
+      durationMs: 1,
+    };
+
+    it("sets pendingDestructive and does not call IPC for DELETE", async () => {
+      const id = useQueryStore.getState().activeTabId;
+      useQueryStore.getState().updateSQL(id, "DELETE FROM users WHERE id = 1");
+
+      await useQueryStore.getState().executeQuery(id);
+
+      expect(executeQuery).not.toHaveBeenCalled();
+      expect(useQueryStore.getState().pendingDestructive).toEqual({
+        tabId: id,
+        summary: "DELETE",
+      });
+      expect(useQueryStore.getState().tabs[0].isExecuting).toBe(false);
+    });
+
+    it("runs after confirmPendingDestructive", async () => {
+      executeQuery.mockResolvedValue(okResult);
+      const id = useQueryStore.getState().activeTabId;
+      useQueryStore.getState().updateSQL(id, "DROP TABLE users");
+
+      await useQueryStore.getState().executeQuery(id);
+      expect(executeQuery).not.toHaveBeenCalled();
+
+      await useQueryStore.getState().confirmPendingDestructive();
+      expect(executeQuery).toHaveBeenCalledWith("DROP TABLE users", "conn-1");
+      expect(useQueryStore.getState().pendingDestructive).toBeNull();
+      expect(useQueryStore.getState().tabs[0].result?.rowCount).toBe(3);
+    });
+
+    it("cancelPendingDestructive clears pending without running", async () => {
+      const id = useQueryStore.getState().activeTabId;
+      useQueryStore.getState().updateSQL(id, "TRUNCATE TABLE users");
+
+      await useQueryStore.getState().executeQuery(id);
+      useQueryStore.getState().cancelPendingDestructive();
+
+      expect(useQueryStore.getState().pendingDestructive).toBeNull();
+      expect(executeQuery).not.toHaveBeenCalled();
+    });
+
+    it("skips the gate when confirmed is true", async () => {
+      executeQuery.mockResolvedValue(okResult);
+      const id = useQueryStore.getState().activeTabId;
+      useQueryStore.getState().updateSQL(id, "DELETE FROM t");
+
+      await useQueryStore.getState().executeQuery(id, { confirmed: true });
+      expect(executeQuery).toHaveBeenCalledTimes(1);
+      expect(useQueryStore.getState().pendingDestructive).toBeNull();
     });
   });
 });
